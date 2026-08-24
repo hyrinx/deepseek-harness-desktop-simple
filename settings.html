@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>设置 - DeepSeek Harness</title>
+<style>
+  /* ════════════════════════════════════════════
+   * Settings 样式：单文件内联，零外部依赖
+   * 结构：页面布局 / 卡片 / 快捷键录制框 /
+   *       按钮 / 关于列表 / Toast
+   * ════════════════════════════════════════════ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    color: #1f2329;
+    background: #fafbfc;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { padding: 20px 24px; }
+
+  /* ── 标签页导航 ── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #ebeef0;
+  }
+  .tab-btn {
+    position: relative;
+    padding: 8px 18px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8a8f99;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color .15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tab-btn:hover { color: #4e5969; }
+  .tab-btn.active {
+    color: #1677ff;
+  }
+  .tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #1677ff;
+    border-radius: 1px 1px 0 0;
+  }
+  .tab-icon {
+    width: 14px; height: 14px;
+    flex-shrink: 0;
+  }
+
+  /* ── 标签内容面板 ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── 卡片容器 ── */
+  .card {
+    background: #fff;
+    border: 1px solid #ebeef0;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .card-title {
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2329;
+    border-bottom: 1px solid #f2f3f5;
+    background: #fcfcfd;
+  }
+  .card-body { padding: 16px; }
+
+  /* ── 快捷键行 ── */
+  .shortcut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .shortcut-info { flex: 1; min-width: 0; }
+  .shortcut-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2329;
+    margin-bottom: 4px;
+  }
+  .shortcut-desc {
+    font-size: 12px;
+    color: #8a8f99;
+    line-height: 1.5;
+  }
+  .shortcut-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── 快捷键录制框（仿 Antd ShortcutRecorder 视觉） ── */
+  .recorder {
+    position: relative;
+    display: inline-block;
+    min-width: 160px;
+    height: 30px;
+    vertical-align: middle;
+  }
+  .recorder-sizer {
+    display: block;
+    visibility: hidden;
+    height: 30px;
+    line-height: 28px;
+    padding: 0 11px;
+    white-space: pre;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .recorder-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 30px;
+    background: #fff;
+    border: 1px solid #d9dbe0;
+    border-radius: 6px;
+    padding: 0 11px;
+    font-family: inherit;
+    font-size: 13px;
+    color: transparent;
+    caret-color: transparent;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .recorder-input:hover { border-color: #b0b4bd; }
+  .recorder-input:focus {
+    border-color: #1677ff;
+    box-shadow: 0 0 0 2px rgba(22,119,255,.1);
+  }
+  .recorder-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    white-space: pre;
+    font-size: 13px;
+    color: #a0a3ab;
+    transition: color .15s;
+  }
+  .recorder-label.has-value { color: #1677ff; font-weight: 600; }
+  .recorder-label.is-recording { color: #1677ff; }
+
+  /* ── 通用按钮 ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid #d9dbe0;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+    color: #4e5969;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+    gap: 4px;
+  }
+  .btn:hover:not(:disabled) {
+    color: #1677ff;
+    border-color: #1677ff;
+    background: #f0f7ff;
+  }
+  .btn:active:not(:disabled) { background: #e6f0ff; }
+  .btn:disabled {
+    cursor: not-allowed;
+    color: #b0b4bd;
+    background: #f5f6f7;
+    border-color: #e5e6e8;
+  }
+  .btn-icon {
+    width: 12px; height: 12px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  /* ── 通用设置行：label + 右侧控件 ── */
+  .setting-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 4px 0;
+  }
+  .setting-info { flex: 1; min-width: 0; }
+  .setting-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2329;
+    margin-bottom: 4px;
+    line-height: 1.5;
+  }
+  .setting-desc {
+    font-size: 12px;
+    color: #8a8f99;
+    line-height: 1.6;
+  }
+  .setting-desc.warn { color: #f53f3f; }
+  .setting-control { flex-shrink: 0; display: flex; align-items: center; height: 30px; }
+
+  /* ── Switch 开关（仿 Antd，纯 CSS，基于 checkbox 受控） ── */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 22px;
+    line-height: 22px;
+  }
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+  .switch-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #d9dbe0;
+    border-radius: 22px;
+    transition: background-color .2s;
+  }
+  .switch-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    top: 2px;
+    background-color: #fff;
+    border-radius: 50%;
+    transition: transform .2s, box-shadow .2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,.2);
+  }
+  .switch input:checked + .switch-slider {
+    background-color: #1677ff;
+  }
+  .switch input:checked + .switch-slider::before {
+    transform: translateX(18px);
+  }
+  .switch input:disabled + .switch-slider {
+    cursor: not-allowed;
+    background-color: #e5e6e8;
+    opacity: .75;
+  }
+  .switch input:disabled + .switch-slider::before {
+    background-color: #f7f8fa;
+  }
+  .switch input:focus-visible + .switch-slider {
+    outline: 2px solid rgba(22,119,255,.2);
+    outline-offset: 2px;
+  }
+
+  /* ── 关于信息 ── */
+  .about-list { list-style: none; }
+  .about-list li {
+    display: flex;
+    padding: 8px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    border-bottom: 1px dashed #f2f3f5;
+  }
+  .about-list li:last-child { border-bottom: none; }
+  .about-label {
+    width: 80px;
+    flex-shrink: 0;
+    color: #8a8f99;
+  }
+  .about-value {
+    flex: 1;
+    color: #1f2329;
+    word-break: break-all;
+  }
+
+  /* ── Toast 悬浮提示 ── */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .toast.success { background: #f0fff4; color: #00b42a; border: 1px solid #b7eb8f; }
+  .toast.info    { background: #f0f7ff; color: #1677ff; border: 1px solid #91caff; }
+  .toast.error   { background: #fff1f0; color: #f53f3f; border: 1px solid #ffa39e; }
+  .toast-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ── 日志卡片 ── */
+  .log-path-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .log-path-label {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #8a8f99;
+  }
+  .log-path-value {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    background: #f7f8fa;
+    border: 1px solid #e5e6e8;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #4e5969;
+    font-family: Consolas, "Courier New", monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .log-file-list {
+    border: 1px solid #ebeef0;
+    border-radius: 6px;
+    overflow: hidden;
+    max-height: 220px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+  }
+  .log-file-header,
+  .log-file-row {
+    display: grid;
+    grid-template-columns: 1fr 90px 150px 40px;
+    gap: 8px;
+    padding: 8px 12px;
+    align-items: center;
+  }
+  .log-file-header {
+    background: #f7f8fa;
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a8f99;
+    border-bottom: 1px solid #ebeef0;
+    position: sticky;
+    top: 0;
+  }
+  .log-file-row {
+    font-size: 12px;
+    border-bottom: 1px solid #f2f3f5;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .log-file-row:last-child { border-bottom: none; }
+  .log-file-row:hover { background: #f7faff; }
+  .log-file-row.active {
+    background: #e6f0ff;
+    color: #1677ff;
+  }
+  .log-file-row.missing { color: #c9cdd4; font-style: italic; cursor: default; }
+  .log-file-row.missing:hover { background: transparent; }
+  .log-file-name {
+    font-family: Consolas, "Courier New", monospace;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-file-size { text-align: right; color: #8a8f99; }
+  .log-file-row.active .log-file-size { color: #1677ff; }
+  .log-file-time {
+    color: #8a8f99;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .log-file-row.active .log-file-time { color: #1677ff; }
+  .log-file-status {
+    text-align: center;
+    font-size: 11px;
+  }
+  .log-file-status .tag-today {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: #e8f3ff;
+    color: #1677ff;
+    font-style: normal;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── 标签页导航 ── -->
+  <div class="tabs" id="tabNav">
+    <button class="tab-btn active" data-tab="general">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      常规
+    </button>
+    <button class="tab-btn" data-tab="logs">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      日志
+    </button>
+    <button class="tab-btn" data-tab="about">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+      关于
+    </button>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════
+     标签页 1：常规（开机自启 + 快捷键）
+     ═════════════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-general">
+
+    <div class="card">
+      <div class="card-title">常规</div>
+      <div class="card-body">
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">开机自动启动</div>
+            <div class="setting-desc" id="autostartDesc">登录 Windows 时自动启动本应用（仅打包为 .exe 后可用）</div>
+          </div>
+          <div class="setting-control">
+            <label class="switch" id="autostartSwitchWrap">
+              <input type="checkbox" id="autostartInput" aria-label="开机自动启动开关">
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">快捷键</div>
+      <div class="card-body">
+        <div class="shortcut-row">
+          <div class="shortcut-info">
+            <div class="shortcut-name">切换窗口显示 / 隐藏</div>
+            <div class="shortcut-desc">全局快捷键，在任何应用中都有效</div>
+          </div>
+          <div class="shortcut-actions">
+            <div class="recorder" id="shortcutRecorder">
+              <span class="recorder-sizer" id="recorderSizer" aria-hidden></span>
+              <input class="recorder-input" id="recorderInput" readonly />
+              <span class="recorder-label" id="recorderLabel">点击录制快捷键</span>
+            </div>
+            <button class="btn" id="resetBtn" title="恢复默认">
+              <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+              </svg>
+              重置
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════
+     标签页 2：日志与排障
+     ═════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-logs">
+
+    <div class="card">
+      <div class="card-title">日志与排障</div>
+      <div class="card-body">
+        <div class="log-path-row">
+          <span class="log-path-label">日志目录</span>
+          <span class="log-path-value" id="logDirPath">-</span>
+        </div>
+
+        <div class="log-actions">
+          <button class="btn" id="logOpenFolderBtn" title="在资源管理器中打开日志目录">
+            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            打开日志目录
+          </button>
+          <button class="btn" id="logOpenSelectedBtn" disabled title="用默认编辑器打开选中的日志文件">
+            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            打开选中文件
+          </button>
+          <button class="btn" id="logDeleteSelectedBtn" disabled title="删除选中的日志文件（无法恢复）">
+            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"></path>
+              <path d="M10 11v6M14 11v6"></path>
+              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            删除选中文件
+          </button>
+          <button class="btn" id="logRefreshBtn" title="刷新日志文件列表">
+            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            刷新
+          </button>
+        </div>
+
+        <div class="log-file-list">
+          <div class="log-file-header">
+            <div>文件</div>
+            <div style="text-align:right;">大小</div>
+            <div>修改时间</div>
+            <div style="text-align:center;">状态</div>
+          </div>
+          <div id="logFileListBody">
+            <!-- 运行时填充 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════
+     标签页 3：关于
+     ═════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-about">
+
+    <div class="card">
+      <div class="card-title">关于</div>
+      <div class="card-body">
+        <ul class="about-list">
+          <li><span class="about-label">应用名称</span><span class="about-value">DeepSeek Harness</span></li>
+          <li><span class="about-label">版本</span><span class="about-value" id="appVersion">0.1.0</span></li>
+          <li><span class="about-label">平台</span><span class="about-value" id="appPlatform">-</span></li>
+          <li><span class="about-label">说明</span><span class="about-value">DeepSeek 轻量桌面包装，基于 Electron</span></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Toast 容器 ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   设置页渲染进程脚本（纯原生，零依赖）
+   模块：
+     1. 常量与快捷键映射
+     2. 工具函数（键盘 → Accelerator、显示格式化）
+     3. Toast 提示
+     4. IPC 桥接封装
+     5. DOM 引用与 state（状态集中管理）
+     6. 录制器状态机
+     7. 事件绑定
+     8. 启动初始化
+   ═══════════════════════════════════════════════════════════════ */
+
+// ───────────────────────────────────────────────────────────
+// 1. 常量
+// ───────────────────────────────────────────────────────────
+
+const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+Space'
+const PLACEHOLDER_IDLE = '点击录制快捷键'
+const PLACEHOLDER_REC  = '按下组合键...'
+
+// event.code → Electron Accelerator 键名
+const CODE_TO_KEY = Object.assign(Object.create(null), {
+  Space: 'Space', Backspace: 'Backspace', Delete: 'Delete',
+  Enter: 'Enter', Escape: 'Esc', Tab: 'Tab',
+  ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+  Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDn',
+  Insert: 'Insert', CapsLock: 'CapsLock',
+  Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[',
+  BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'",
+  Comma: ',', Period: '.', Slash: '/',
+})
+
+// 显示友好名称
+const KEY_DISPLAY = Object.assign(Object.create(null), {
+  Space: 'Space', Backspace: '⌫', Delete: 'Del', Enter: 'Enter',
+  Escape: 'Esc', Tab: 'Tab',
+  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+  Up: '↑', Down: '↓', Left: '←', Right: '→',
+  Home: 'Home', End: 'End', PageUp: 'PgUp', PageDown: 'PgDn',
+  Control: 'Ctrl', CommandOrControl: 'Ctrl',
+  Alt: 'Alt', Shift: 'Shift', Meta: 'Win',
+  Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[',
+  BracketRight: ']', Backslash: '\\', Semicolon: ';', Quote: "'",
+  Comma: ',', Period: '.', Slash: '/',
+  Insert: 'Ins', CapsLock: 'Caps',
+})
+
+// 修饰符左右键归一化：e.code 给出的是 ShiftLeft/ControlRight 等，必须归一成标准名再参与判定
+const MODIFIER_NORMALIZE = Object.assign(Object.create(null), {
+  ShiftLeft: 'Shift', ShiftRight: 'Shift',
+  ControlLeft: 'Control', ControlRight: 'Control',
+  AltLeft: 'Alt', AltRight: 'Alt',
+  MetaLeft: 'Meta', MetaRight: 'Meta',
+  OSLeft: 'Meta', OSRight: 'Meta', // 个别平台键盘使用 OSLeft/OSRight
+})
+
+// 修饰符"标准名"集合（用于 modifier-only 判定和自动提交的末段判定）
+const PURE_MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta', 'CommandOrControl'])
+
+// ───────────────────────────────────────────────────────────
+// 2. 工具函数
+// ───────────────────────────────────────────────────────────
+
+function codeToAccelKey(code) {
+  // 先处理左右修饰符归一化，避免 ShiftLeft/ControlRight 这种"未映射代码"直接流入
+  const normalized = MODIFIER_NORMALIZE[code]
+  if (normalized) return normalized
+  if (code.startsWith('Key'))    return code.slice(3)
+  if (code.startsWith('Digit'))  return code.slice(5)
+  if (code.startsWith('Numpad')) return 'Num' + code.slice(6)
+  if (/^F\d+$/.test(code))       return code
+  return CODE_TO_KEY[code] || code
+}
+
+/**
+ * 将 keydown 事件转换为 Electron Accelerator 字符串。
+ * - modifier-only（只按 Ctrl/Shift/Alt）：返回 null，等待用户继续按键
+ * - 非法组合（单个字母，无修饰）：返回 null
+ * - Fn 单键：允许
+ */
+function eventToAccelerator(e) {
+  const modifiers = []
+  if (e.ctrlKey || e.metaKey) modifiers.push('CommandOrControl')
+  if (e.altKey) modifiers.push('Alt')
+  if (e.shiftKey) modifiers.push('Shift')
+
+  const key = codeToAccelKey(e.code)
+  if (PURE_MODIFIER_KEYS.has(key)) {
+    return modifiers.length ? modifiers.join('+') : null
+  }
+
+  modifiers.push(key)
+  // 合法组合：至少 2 段（修饰符 + 主键）或 Fn 单键
+  if (/^F\d+$/.test(key) || modifiers.length >= 2) {
+    return modifiers.join('+')
+  }
+  return null
+}
+
+function formatShortcut(raw) {
+  if (!raw) return ''
+  return raw.split('+').map((k) => KEY_DISPLAY[k] || k).join(' + ')
+}
+
+// ───────────────────────────────────────────────────────────
+// 3. Toast 封装（防抖动，连续调用覆盖前一次）
+// ───────────────────────────────────────────────────────────
+
+const Toast = (() => {
+  const el = document.getElementById('toast')
+  let timer = null
+  function show(msg, type = 'info', duration = 1800) {
+    el.className = 'toast ' + type
+    el.innerHTML = '<span class="toast-dot"></span>' + msg
+    // 强制触发 CSS 过渡
+    void el.offsetWidth
+    el.classList.add('show')
+    clearTimeout(timer)
+    timer = setTimeout(() => el.classList.remove('show'), duration)
+  }
+  return {
+    success: (m) => show(m, 'success'),
+    info:    (m) => show(m, 'info'),
+    error:   (m) => show(m, 'error'),
+  }
+})()
+
+// ───────────────────────────────────────────────────────────
+// 4. IPC 桥接封装（catch 错误，统一 Toast）
+// ───────────────────────────────────────────────────────────
+
+const IPC = {
+  async getSettings() {
+    try { return await window.settingsAPI.getSettings() }
+    catch (e) { console.warn('[ipc] getSettings 失败', e); return {} }
+  },
+  async setShortcut(name, value) {
+    try {
+      await window.settingsAPI.setShortcut(name, value)
+      return true
+    } catch (e) {
+      console.error('[ipc] setShortcut 失败', e)
+      Toast.error('保存失败')
+      return false
+    }
+  },
+  async getAutoStart() {
+    try { return await window.settingsAPI.getAutoStart() }
+    catch (e) {
+      console.warn('[ipc] getAutoStart 失败', e)
+      return { enabled: false, available: false, actuallySet: false }
+    }
+  },
+  async setAutoStart(enabled) {
+    try { return await window.settingsAPI.setAutoStart(enabled) }
+    catch (e) {
+      console.error('[ipc] setAutoStart 失败', e)
+      Toast.error('设置失败')
+      return null
+    }
+  },
+  async fillAboutInfo() {
+    const [platform, version] = await Promise.all([
+      window.settingsAPI.getPlatform().catch(() => '-'),
+      window.settingsAPI.getVersion().catch(() => '0.1.0'),
+    ])
+    document.getElementById('appPlatform').textContent = platform
+    document.getElementById('appVersion').textContent = version
+  },
+  closeWindow() {
+    try { window.settingsAPI.closeWindow() } catch {}
+  },
+
+  // 日志
+  async logsGetInfo() {
+    try { return await window.logsAPI.getInfo() }
+    catch (e) { console.warn('[ipc] logsGetInfo 失败', e); return null }
+  },
+  async logsOpenFolder() {
+    try { return await window.logsAPI.openFolder() }
+    catch (e) { console.warn('[ipc] logsOpenFolder 失败', e); Toast.error('打开日志目录失败'); return false }
+  },
+  async logsOpenFile(stamp) {
+    try { return await window.logsAPI.openFile(stamp) }
+    catch (e) { console.warn('[ipc] logsOpenFile 失败', e); return { ok: false, error: String(e) } }
+  },
+  async logsTail(stamp, maxChars) {
+    try { return await window.logsAPI.tail(stamp, maxChars) }
+    catch (e) { return { ok: false, error: String(e), content: '', truncated: false, size: 0 } }
+  },
+  async logsDeleteFile(stamp) {
+    try { return await window.logsAPI.deleteFile(stamp) }
+    catch (e) { return { ok: false, error: String(e) } }
+  },
+}
+
+// ───────────────────────────────────────────────────────────
+// 5. DOM 引用 + 状态集中管理
+// ───────────────────────────────────────────────────────────
+
+const DOM = {
+  sizer:     document.getElementById('recorderSizer'),
+  input:     document.getElementById('recorderInput'),
+  label:     document.getElementById('recorderLabel'),
+  resetBtn:  document.getElementById('resetBtn'),
+  autostart: {
+    input: document.getElementById('autostartInput'),
+    desc:  document.getElementById('autostartDesc'),
+  },
+  logs: {
+    dirPath: document.getElementById('logDirPath'),
+    listBody: document.getElementById('logFileListBody'),
+    openFolderBtn: document.getElementById('logOpenFolderBtn'),
+    openSelectedBtn: document.getElementById('logOpenSelectedBtn'),
+    deleteSelectedBtn: document.getElementById('logDeleteSelectedBtn'),
+    refreshBtn: document.getElementById('logRefreshBtn'),
+  },
+}
+
+const state = {
+  // 录制器
+  recorder: {
+    shortcut: DEFAULT_SHORTCUT, // 当前已提交的 accelerator
+    draft: '',                  // 正在录制但未提交的值
+    recording: false,           // 是否处于录制态
+  },
+  // 开机自启
+  autostart: {
+    enabled: false,       // 用户偏好值
+    available: false,     // 是否可用（仅打包 exe 时 true）
+    actuallySet: false,   // 系统实际注册状态
+    busy: false,          // IPC 进行中，防重复点击
+  },
+  // 日志
+  logs: {
+    dir: '',
+    todayStamp: '',
+    files: [],            // [{stamp, exists, size, mtime, path, name}]
+    selectedStamp: null,  // 当前选中的日期
+    busy: false,          // 加载中防重复
+  },
+}
+
+// ───────────────────────────────────────────────────────────
+// 6. 录制器状态机（render / start / stop / cancel / clear / commit）
+// ───────────────────────────────────────────────────────────
+
+const Recorder = {
+  render() {
+    const { shortcut, draft, recording } = state.recorder
+    const preview = draft || (!recording ? shortcut : '')
+    const text = preview ? formatShortcut(preview) : ''
+    const placeholder = recording ? PLACEHOLDER_REC : PLACEHOLDER_IDLE
+    const display = text || placeholder
+
+    DOM.sizer.textContent = display
+    DOM.label.textContent = display
+    DOM.label.classList.toggle('has-value', !!text && !recording)
+    DOM.label.classList.toggle('is-recording', recording)
+    DOM.resetBtn.disabled = shortcut === DEFAULT_SHORTCUT
+  },
+
+  start() {
+    state.recorder.draft = ''
+    state.recorder.recording = true
+    this.render()
+  },
+
+  stop() {
+    state.recorder.recording = false
+    // 以 draft 为准提交（若 draft 空则保持原值）
+    if (state.recorder.draft) this.commit(state.recorder.draft)
+    else this.render()
+  },
+
+  cancel() {
+    state.recorder.recording = false
+    state.recorder.draft = state.recorder.shortcut
+    this.render()
+  },
+
+  clear() {
+    state.recorder.recording = false
+    this.commit('')
+  },
+
+  async commit(newValue) {
+    const prev = state.recorder.shortcut
+    state.recorder.shortcut = newValue
+    state.recorder.draft = newValue
+    this.render()
+
+    const ok = await IPC.setShortcut('toggleWindow', newValue)
+    if (!ok) {
+      // 失败回滚
+      state.recorder.shortcut = prev
+      state.recorder.draft = prev
+      this.render()
+      return
+    }
+    if (newValue) Toast.success('快捷键已更新')
+    else Toast.info('快捷键已清除')
+  },
+}
+
+// ───────────────────────────────────────────────────────────
+// 6a. 开机自启状态机（render / load / commit）
+// ───────────────────────────────────────────────────────────
+
+const AutoStart = {
+  /**
+   * 同步渲染：checkbox 状态、disabled 状态、描述文案
+   * 以 state.autostart 为单一真源，防止 DOM 与状态脱节
+   */
+  render() {
+    const { enabled, available, busy } = state.autostart
+    const el = DOM.autostart.input
+    const desc = DOM.autostart.desc
+
+    el.checked = enabled
+    el.disabled = !available || busy
+    el.setAttribute('aria-busy', String(busy))
+
+    if (!available) {
+      desc.textContent = '该功能仅在打包为 .exe 安装版后可用（调试模式下无法修改）'
+      desc.classList.add('warn')
+    } else {
+      desc.textContent = '登录 Windows 时自动启动本应用（自动启动仅出现在系统托盘，不主动显示窗口）'
+      desc.classList.remove('warn')
+    }
+  },
+
+  async load() {
+    const res = await IPC.getAutoStart()
+    state.autostart.enabled = Boolean(res?.enabled)
+    state.autostart.available = Boolean(res?.available)
+    state.autostart.actuallySet = Boolean(res?.actuallySet)
+    this.render()
+  },
+
+  async commit(nextEnabled) {
+    if (state.autostart.busy) return
+    if (!state.autostart.available) {
+      Toast.info('打包为 .exe 后可使用此功能')
+      this.render() // 强制把 checkbox 打回原值
+      return
+    }
+
+    const prev = state.autostart.enabled
+    state.autostart.enabled = nextEnabled
+    state.autostart.busy = true
+    this.render()
+
+    const res = await IPC.setAutoStart(nextEnabled)
+    state.autostart.busy = false
+
+    if (!res) {
+      // IPC 失败：回滚
+      state.autostart.enabled = prev
+      this.render()
+      return
+    }
+
+    state.autostart.enabled = Boolean(res.enabled)
+    state.autostart.actuallySet = Boolean(res.actuallySet)
+    this.render()
+
+    Toast.success(nextEnabled ? '已开启开机自启' : '已关闭开机自启')
+  },
+}
+
+// ───────────────────────────────────────────────────────────
+// 6b. 日志模块（工具、加载、渲染、选中、预览、操作）
+// ───────────────────────────────────────────────────────────
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let n = bytes
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
+  return (n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(2)) + ' ' + units[i]
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '-'
+  try {
+    const d = new Date(iso)
+    const p = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  } catch { return '-' }
+}
+
+const Logs = {
+  /** 根据 state 渲染文件列表、按钮禁用态 */
+  renderList() {
+    const { files, selectedStamp, todayStamp } = state.logs
+    const body = DOM.logs.listBody
+    body.innerHTML = ''
+
+    if (!files.length) {
+      body.innerHTML = '<div class="log-file-row missing" style="justify-content:center;">无日志文件</div>'
+      this.updateActions()
+      return
+    }
+
+    for (const f of files) {
+      const row = document.createElement('div')
+      row.className = 'log-file-row' + (f.exists ? '' : ' missing') + (selectedStamp === f.stamp ? ' active' : '')
+      row.dataset.stamp = f.stamp
+
+      const name = document.createElement('div')
+      name.className = 'log-file-name'
+      name.textContent = f.name
+      name.title = f.path || f.name
+      row.appendChild(name)
+
+      const size = document.createElement('div')
+      size.className = 'log-file-size'
+      size.textContent = f.exists ? formatBytes(f.size) : '-'
+      row.appendChild(size)
+
+      const time = document.createElement('div')
+      time.className = 'log-file-time'
+      time.textContent = f.exists ? formatDateTime(f.mtime) : '-'
+      row.appendChild(time)
+
+      const status = document.createElement('div')
+      status.className = 'log-file-status'
+      if (f.stamp === todayStamp) {
+        status.innerHTML = '<span class="tag-today">今天</span>'
+      } else if (!f.exists) {
+        status.textContent = '—'
+      } else {
+        status.textContent = '✓'
+      }
+      row.appendChild(status)
+
+      if (f.exists) {
+        row.addEventListener('click', () => this.select(f.stamp))
+      }
+      body.appendChild(row)
+    }
+
+    this.updateActions()
+  },
+
+  updateActions() {
+    const { selectedStamp, files } = state.logs
+    const selected = files.find((f) => f.stamp === selectedStamp && f.exists)
+    const hasSelected = Boolean(selected)
+    DOM.logs.openSelectedBtn.disabled = !hasSelected
+    DOM.logs.deleteSelectedBtn.disabled = !hasSelected
+  },
+
+  select(stamp) {
+    state.logs.selectedStamp = stamp
+    this.renderList()
+  },
+
+  async loadInfo({ reload = false } = {}) {
+    if (state.logs.busy) return
+    state.logs.busy = true
+    try {
+      const info = await IPC.logsGetInfo()
+      if (!info) {
+        Toast.error(reload ? '刷新失败' : '日志加载失败')
+        return
+      }
+      state.logs.dir = info.dir || ''
+      state.logs.todayStamp = info.todayStamp || ''
+      state.logs.files = info.files || []
+      DOM.logs.dirPath.textContent = state.logs.dir || '-'
+      DOM.logs.dirPath.title = state.logs.dir || ''
+
+      // 首次加载自动选中今天（若存在），否则保持选中状态
+      if (!reload || !state.logs.selectedStamp) {
+        const today = state.logs.files.find((f) => f.stamp === state.logs.todayStamp && f.exists)
+        if (today) state.logs.selectedStamp = today.stamp
+        else {
+          const first = state.logs.files.find((f) => f.exists)
+          state.logs.selectedStamp = first ? first.stamp : null
+        }
+      } else {
+        // 若选中的已不存在，重置
+        const still = state.logs.files.find((f) => f.stamp === state.logs.selectedStamp && f.exists)
+        if (!still) state.logs.selectedStamp = null
+      }
+
+      this.renderList()
+      if (reload) Toast.success('已刷新')
+    } finally {
+      state.logs.busy = false
+    }
+  },
+
+  async openFolder() {
+    await IPC.logsOpenFolder()
+  },
+
+  async openSelected() {
+    const stamp = state.logs.selectedStamp
+    if (!stamp) return
+    const res = await IPC.logsOpenFile(stamp)
+    if (!res?.ok) Toast.error('打开失败：' + (res?.error || '未知错误'))
+  },
+
+  async deleteSelected() {
+    const stamp = state.logs.selectedStamp
+    if (!stamp) return
+    const file = state.logs.files.find((f) => f.stamp === stamp)
+    if (!file?.exists) return
+    const confirmed = window.confirm(`确认删除日志文件「${file.name}」吗？此操作不可恢复。`)
+    if (!confirmed) return
+    const res = await IPC.logsDeleteFile(stamp)
+    if (res?.ok) {
+      Toast.success('已删除')
+      state.logs.selectedStamp = null
+      await this.loadInfo({ reload: true })
+    } else {
+      Toast.error('删除失败：' + (res?.error || '未知错误'))
+    }
+  },
+}
+
+
+// ───────────────────────────────────────────────────────────
+
+function bindEvents() {
+  const { input, resetBtn, autostart, logs } = DOM
+
+  // ── 标签页切换 ──
+  const tabNav = document.getElementById('tabNav')
+  const tabBtns = tabNav.querySelectorAll('.tab-btn')
+  const tabPanels = document.querySelectorAll('.tab-panel')
+
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.dataset.tab
+      // 切换按钮激活态
+      tabBtns.forEach((b) => b.classList.remove('active'))
+      btn.classList.add('active')
+      // 切换面板显示
+      tabPanels.forEach((p) => p.classList.remove('active'))
+      const targetPanel = document.getElementById('tab-' + targetTab)
+      if (targetPanel) targetPanel.classList.add('active')
+    })
+  })
+
+  input.addEventListener('focus', () => Recorder.start())
+  input.addEventListener('blur', () => {
+    if (!state.recorder.recording) return
+    Recorder.stop()
+  })
+
+  autostart.input.addEventListener('change', (e) => {
+    AutoStart.commit(Boolean(e.target.checked))
+  })
+
+  // 键盘事件：捕获阶段优先处理，防止被其他控件吞
+  document.addEventListener('keydown', (e) => {
+    // 场景 A：录制态
+    if (state.recorder.recording) {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const noMod = !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey
+      if (noMod && (e.key === 'Backspace' || e.key === 'Delete')) {
+        input.blur()
+        Recorder.clear()
+        return
+      }
+      if (e.key === 'Escape') {
+        input.blur()
+        Recorder.cancel()
+        return
+      }
+
+      const accel = eventToAccelerator(e)
+      if (!accel) return
+
+      state.recorder.draft = accel
+      // 自动提交：末段不是"修饰符标准名"，且至少 2 段（或 Fn 单键）
+      const parts = accel.split('+')
+      const last = parts[parts.length - 1]
+      const isModifier = PURE_MODIFIER_KEYS.has(last)
+      if (!isModifier && parts.length >= 2) {
+        input.blur()
+        // 走 commit 分支（提交前先关闭 recording 标记）
+        state.recorder.recording = false
+        Recorder.commit(accel)
+      } else {
+        Recorder.render()
+      }
+      return
+    }
+
+    // 场景 B：非录制态，Esc 关闭设置窗口
+    if (e.key === 'Escape') {
+      // 防止 input 聚焦时触发浏览器默认 blur 行为
+      IPC.closeWindow()
+    }
+  }, true)
+
+  resetBtn.addEventListener('click', async () => {
+    state.recorder.recording = false
+    Recorder.commit(DEFAULT_SHORTCUT)
+    Toast.success('已恢复默认快捷键')
+  })
+
+  // 日志按钮事件
+  logs.openFolderBtn.addEventListener('click', () => Logs.openFolder())
+  logs.openSelectedBtn.addEventListener('click', () => Logs.openSelected())
+  logs.deleteSelectedBtn.addEventListener('click', () => Logs.deleteSelected())
+  logs.refreshBtn.addEventListener('click', () => Logs.loadInfo({ reload: true }))
+}
+
+// ───────────────────────────────────────────────────────────
+// 8. 启动初始化（并发拉取设置 + 平台 + 版本）
+// ───────────────────────────────────────────────────────────
+
+async function init() {
+  const [settings] = await Promise.all([
+    IPC.getSettings(),
+    IPC.fillAboutInfo(),
+    AutoStart.load(), // 与其他设置并行拉取
+    Logs.loadInfo(),  // 日志列表与目录并行加载
+  ])
+
+  const saved = settings?.shortcuts?.toggleWindow
+  if (saved !== undefined && saved !== null) {
+    state.recorder.shortcut = saved
+    state.recorder.draft = saved
+  }
+
+  Recorder.render()
+  bindEvents()
+}
+
+init().catch((e) => {
+  console.error('[settings] 初始化失败', e)
+  Toast.error('初始化失败')
+})
+</script>
+</body>
+</html>
