@@ -2,7 +2,7 @@
 // 常量与纯工具函数（无副作用，可被任意模块安全引用）
 // ═══════════════════════════════════════════════════════════════
 
-const { join, dirname } = require('node:path')
+const { join } = require('node:path')
 
 const APP_NAME = 'DeepSeek Harness'
 const APP_USER_MODEL_ID = 'ai.deepseek.harness.desktop'
@@ -40,13 +40,7 @@ function todayStamp(d = new Date()) {
 // 该目录每次启动都会变，不能作为数据根目录。
 // process.env.PORTABLE_EXECUTABLE_DIR 才是用户双击的 exe 所在目录（稳定）。
 function appRootDir() {
-  const { app } = require('electron')
-  if (app.isPackaged) {
-    return process.env.PORTABLE_EXECUTABLE_DIR || dirname(app.getPath('exe'))
-  }
-  // 开发模式：process.execPath 指向 node_modules 内的 electron.exe，
-  // 不能作为数据目录，改用项目根目录
-  return process.cwd()
+  return require('./runtime').dataRootDir()
 }
 
 function logDirPath() { return join(appRootDir(), 'logs') }

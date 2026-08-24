@@ -49,14 +49,35 @@ async function requestRestart() {
   if (state.isQuitting) { logEvent('restart.request.duplicate'); return }
   state.isQuitting = true
   const t0 = Date.now()
-  logEvent('restart.request', { cause: 'requestRestart', argv: process.argv })
+  const { realExePath, mode } = require('./runtime')
+  logEvent('restart.request', {
+    cause: 'requestRestart',
+    mode: mode(),
+    argv: process.argv,
+    execPath: process.execPath,
+    realExePath: realExePath(),
+    isPackaged: app.isPackaged,
+    cwd: process.cwd(),
+  })
   try { destroyUI() } catch (err) { logEvent('restart.destroyUI.fail', { err }, 'warn') }
   try {
     const { shutdownHost } = require('./host')
     await shutdownHost()
   } catch (err) { logEvent('restart.shutdownHost.fail', { err }, 'warn') }
+
   const cleanArgs = process.argv.slice(1).filter((a) => a !== AUTOSTART_ARG)
-  app.relaunch({ args: cleanArgs })
+  const exe = realExePath()
+
+  // 三种模式统一走 app.relaunch：
+  // 便携版通过 execPath 覆盖指向真实 exe（PORTABLE_EXECUTABLE_FILE，
+  // 含版本号文件名），绕开 %TEMP% 临时目录和内层 exe 名不匹配的问题。
+  // dev 模式 exe 为 null → 用默认 process.execPath（electron.exe）。
+  logEvent('restart.relaunch', { cleanArgs, execPath: exe || '(default)', mode: mode() })
+  app.relaunch({
+    args: cleanArgs,
+    execPath: exe || undefined,
+  })
+
   logEvent('restart.app.quit', { tookMs: Date.now() - t0, cleanArgs })
   logWriter.close()
   app.quit()

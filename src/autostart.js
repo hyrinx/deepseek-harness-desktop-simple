@@ -9,21 +9,31 @@ const { AUTOSTART_ARG } = require('./constants')
 
 function applyAutoStart(enabled) {
   try {
-    if (app.isPackaged) {
-      app.setLoginItemSettings({
-        openAtLogin: enabled,
-        args: [AUTOSTART_ARG],
-      })
-    } else {
-      app.setLoginItemSettings({ openAtLogin: false })
-    }
+    const { realExePath } = require('./runtime')
+    const exe = realExePath()
+    app.setLoginItemSettings({
+      openAtLogin: app.isPackaged && enabled,
+      path: exe || undefined,
+      args: [AUTOSTART_ARG],
+    })
+    const settings = app.getLoginItemSettings()
     logEvent('autostart.apply', {
       requested: enabled,
-      effective: app.getLoginItemSettings().openAtLogin,
+      effective: settings.openAtLogin,
       isPackaged: app.isPackaged,
     })
+    return {
+      enabled: settings.openAtLogin,
+      available: app.isPackaged,
+      actuallySet: settings.openAtLogin,
+    }
   } catch (err) {
     logEvent('autostart.apply.fail', { err }, 'error')
+    return {
+      enabled: false,
+      available: app.isPackaged,
+      actuallySet: false,
+    }
   }
 }
 
