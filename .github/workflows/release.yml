@@ -64,6 +64,25 @@ jobs:
       - name: 列出产物
         run: ls -R dist/
 
+      - name: 生成发布说明(手写模板 + 自动 Changelog)
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ inputs.tag_name || github.ref_name }}"
+          # 用 tag 让 GitHub 依 commit/PR 生成完整变更记录(含 Contributors)
+          NOTES="$(gh api -X POST "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$TAG" --jq '.body')"
+          {
+            echo "## 发布说明"
+            echo
+            cat release-template.md
+            echo
+            echo "### 完整变更记录(自动生成)"
+            echo
+            echo "$NOTES"
+          } > RELEASE_BODY.md
+          echo "RESULT_TAG=$TAG" >> "$GITHUB_ENV"
+
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -76,6 +95,6 @@ jobs:
             dist/*/*.deb
             dist/*/*.rpm
             dist/*/*.zip
-          tag_name: ${{ inputs.tag_name || github.ref_name }}
+          body_path: RELEASE_BODY.md
+          tag_name: ${{ env.RESULT_TAG }}
           draft: true
-          generate_release_notes: true
