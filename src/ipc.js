@@ -3,14 +3,17 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { BrowserWindow, shell, app, ipcMain } = require('electron')
-const { basename, join } = require('node:path')
 const fs = require('node:fs')
 const { logEvent } = require('./state')
 const { store } = require('./store')
-const { todayStamp, logDirPath } = require('./constants')
+const { logDirPath } = require('./constants')
 const { applyAutoStart } = require('./autostart')
+const { registerEnvHandlers } = require('./env')
 
 // ── 全局快捷键 ──
+
+// 渲染进程可写入的快捷键键名白名单（防原型污染 / 越权写入 store 任意路径）
+const SHORTCUT_KEYS = new Set(['toggleWindow'])
 
 function registerGlobalShortcut(accelerator) {
   const { globalShortcut } = require('electron')
@@ -45,6 +48,10 @@ function registerIpcHandlers() {
   ipcMain.handle('settings:get', () => store.store)
 
   ipcMain.handle('settings:set-shortcut', (_e, name, value) => {
+    if (!SHORTCUT_KEYS.has(name)) {
+      logEvent('shortcut.set.invalid', { name }, 'warn')
+      return false
+    }
     store.set(`shortcuts.${name}`, value)
     registerGlobalShortcut(value)
     return true
@@ -65,21 +72,16 @@ function registerIpcHandlers() {
   ipcMain.handle('get-platform', () => process.platform)
   ipcMain.handle('get-version', () => app.getVersion())
 
-  // 日志相关
+  // 日志相关（单文件 host.log）
   ipcMain.handle('logs:get-info', () => {
     const dir = logDirPath()
-    const { recentLogDates } = require('./constants')
-    const dates = recentLogDates(7)
-    const files = dates.map((stamp) => {
-      const p = join(dir, `host-${stamp}.log`)
-      try {
-        const st = fs.statSync(p)
-        return { stamp, exists: true, size: st.size, mtime: st.mtime.toISOString(), path: p, name: basename(p) }
-      } catch {
-        return { stamp, exists: false, size: 0, mtime: null, path: p, name: `host-${stamp}.log` }
-      }
-    })
-    return { dir, todayStamp: todayStamp(), files }
+    const path = require('./constants').logFilePath()
+    let info = { exists: false, size: 0, mtime: null, path, name: 'host.log' }
+    try {
+      const st = fs.statSync(path)
+      info = { exists: true, size: st.size, mtime: st.mtime.toISOString(), path, name: 'host.log' }
+    } catch {}
+    return { dir, path, info }
   })
 
   ipcMain.handle('logs:open-folder', async () => {
@@ -89,13 +91,12 @@ function registerIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('logs:open-file', async (_e, stamp) => {
-    const safeStamp = /^\d{4}-\d{2}-\d{2}$/.test(String(stamp || '')) ? String(stamp) : todayStamp()
-    const target = join(logDirPath(), `host-${safeStamp}.log`)
+  ipcMain.handle('logs:open-file', async () => {
+    const target = require('./constants').logFilePath()
     try {
       if (!fs.existsSync(target)) {
         fs.mkdirSync(logDirPath(), { recursive: true })
-        fs.writeFileSync(target, `# host-${safeStamp}.log — 暂无输出\n# 日志目录：${logDirPath()}\n`, 'utf-8')
+        fs.writeFileSync(target, '', 'utf-8')
       }
     } catch (err) {
       console.error('[logs] touch file 失败：', err)
@@ -104,9 +105,8 @@ function registerIpcHandlers() {
     return { ok: !result, error: result || null, path: target }
   })
 
-  ipcMain.handle('logs:tail', async (_e, stamp, maxChars = 32_768) => {
-    const safeStamp = /^\d{4}-\d{2}-\d{2}$/.test(String(stamp || '')) ? String(stamp) : todayStamp()
-    const target = join(logDirPath(), `host-${safeStamp}.log`)
+  ipcMain.handle('logs:tail', async (_e, maxChars = 32_768) => {
+    const target = require('./constants').logFilePath()
     try {
       const st = fs.statSync(target)
       if (st.size <= maxChars) {
@@ -126,31 +126,23 @@ function registerIpcHandlers() {
     }
   })
 
-  ipcMain.handle('logs:delete-file', async (_e, stamp) => {
-    const safeStamp = /^\d{4}-\d{2}-\d{2}$/.test(String(stamp || '')) ? String(stamp) : null
-    if (!safeStamp) return { ok: false, error: 'invalid stamp' }
-    const target = join(logDirPath(), `host-${safeStamp}.log`)
+  ipcMain.handle('logs:clear', async () => {
+    const target = require('./constants').logFilePath()
     try {
-      if (fs.existsSync(target)) fs.unlinkSync(target)
+      fs.writeFileSync(target, '', 'utf-8')
       return { ok: true }
     } catch (err) {
       return { ok: false, error: String(err?.message || err) }
     }
   })
 
-  ipcMain.handle('logs:open-today', async () => {
-    const safeStamp = todayStamp()
-    const target = join(logDirPath(), `host-${safeStamp}.log`)
-    try {
-      if (!fs.existsSync(target)) {
-        fs.mkdirSync(logDirPath(), { recursive: true })
-        fs.writeFileSync(target, `# host-${safeStamp}.log — 暂无输出\n# 日志目录：${logDirPath()}\n`, 'utf-8')
-      }
-    } catch (err) {
-      console.error('[logs] touch today 失败：', err)
-    }
-    const result = await shell.openPath(target)
-    return { ok: !result, error: result || null, path: target }
+  // 环境检测与更新（委托 env.js）
+  registerEnvHandlers(ipcMain)
+
+  // 设置向导标记（首次启动后置为 done）
+  ipcMain.handle('setup:mark-done', () => {
+    store.set('ui.setupDone', true)
+    return true
   })
 
   // 窗口拖拽（渲染进程 mousedown/mousemove → IPC 坐标 → 主进程 setBounds）

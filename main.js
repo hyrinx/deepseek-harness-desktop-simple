@@ -2,22 +2,23 @@
 // DeepSeek Harness (DSH) 轻量桌面包装 — 主入口
 //
 // 模块结构：
-//   src/constants.js  — 常量与纯工具函数
+//   src/constants.js  — 常量 + 路径函数 + 注入脚本
 //   src/state.js      — 全局状态 + 日志基础设施 + 进程守卫
-//   src/store.js      — 配置存储（userData/config.json）
-//   src/host.js       — Host 子进程管理（spawn / 就绪 / 终止）
+//   src/store.js      — 配置存储（开发：根目录；打包：~/.dsh/storages/）
+//   src/env.js        — 运行时模式 + 环境检测 + 插件安装
+//   src/dsh-home.js   — DSH 路径解析（与 @deepseek-ai/dsh-home-paths 一致）
+//   src/host.js       — dsh 子进程管理（spawn / 就绪 / 终止）
 //   src/windows.js    — 主窗口 + 设置窗口（创建 / 导航 / 显示切换）
-//   src/tray.js       — 托盘与托盘菜单（electron-menubar 封装）
-//   src/tray-menu.js  — 托盘菜单 HTML / 尺寸常量
+//   src/tray.js       — 托盘 + 托盘菜单（electron-menubar 封装）
 //   src/autostart.js  — 开机自启
-//   src/ipc.js        — IPC 处理器 + 全局快捷键
+//   src/ipc.js        — IPC 处理器 + 全局快捷键 + 窗口拖拽
 //   src/lifecycle.js  — 生命周期（destroyUI / 退出 / 重启 / 启动）
-//   preload/          — preload 脚本（preload.js / preload-settings.js）
+//   preload/          — preload 脚本（preload-tray.js / preload-main.js / preload-settings.js）
 //   main.js           — 入口（本文件：单实例锁 + app 事件 + 启动调度）
 // ═══════════════════════════════════════════════════════════════
 
 const { app, globalShortcut } = require('electron')
-const { logEvent, BOOT, installProcessGuards } = require('./src/state')
+const { logEvent, bootElapsed, installProcessGuards } = require('./src/state')
 const { showWindow } = require('./src/windows')
 const { bootstrap, showFatalAndQuit } = require('./src/lifecycle')
 
@@ -59,7 +60,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady()
     .then(() => {
-      logEvent('app.whenReady.ok', { tookMs: Date.now() - BOOT.t0 })
+      logEvent('app.whenReady.ok', { tookMs: bootElapsed() })
       return bootstrap()
     })
     .catch((err) => {

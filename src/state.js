@@ -4,7 +4,7 @@
 
 const fs = require('node:fs')
 const os = require('node:os')
-const { todayStamp, logDirPath, logFilePath } = require('./constants')
+const { logDirPath, logFilePath } = require('./constants')
 
 // ── 日志级别（数值越小越严重） ──
 const LOG_LEVEL = Object.freeze({
@@ -55,21 +55,46 @@ function bootMark(label) {
   return t
 }
 
-// ── 日志写入器（按天切换文件句柄） ──
+function bootElapsed() { return Date.now() - BOOT.t0 }
+
+// ── 日志写入器（单文件 host.log，保留最近 3 天） ──
+const LOG_RETENTION_MS = 3 * 24 * 60 * 60 * 1000
+
+function pruneOldLogLines(path) {
+  try {
+    const raw = fs.readFileSync(path, 'utf-8')
+    const lines = raw.split(/\r?\n/)
+    const cutoff = Date.now() - LOG_RETENTION_MS
+    const kept = []
+    let pruned = false
+    for (const line of lines) {
+      if (!line.trim()) { kept.push(line); continue }
+      const m = line.match(/^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\]/)
+      if (m) {
+        const ts = new Date(m[1]).getTime()
+        if (ts >= cutoff || isNaN(ts)) { kept.push(line) }
+        else { pruned = true }
+      } else {
+        kept.push(line)
+      }
+    }
+    if (pruned) {
+      fs.writeFileSync(path, kept.join('\n'), 'utf-8')
+    }
+  } catch {}
+}
+
 const logWriter = {
-  date: null,
   path: null,
   stream: null,
-  ensure(date = new Date()) {
-    const stamp = todayStamp(date)
-    if (this.date === stamp && this.stream) return this.stream
-    if (this.stream) { try { this.stream.end() } catch {} this.stream = null }
+  ensure() {
+    if (this.stream) return this.stream
     try { fs.mkdirSync(logDirPath(), { recursive: true }) } catch {}
-    const path = logFilePath(date)
+    const path = logFilePath()
+    pruneOldLogLines(path)
     const stream = fs.createWriteStream(path, { flags: 'a', encoding: 'utf-8' })
     const header = `\n${'═'.repeat(64)}\n[session] ${new Date().toISOString()}  pid=${process.pid}  platform=${process.platform}  packaged=${require('electron').app.isPackaged}  argv=${JSON.stringify(process.argv)}\n${'─'.repeat(64)}\n`
     stream.write(header)
-    this.date = stamp
     this.path = path
     this.stream = stream
     return stream
@@ -152,4 +177,4 @@ function installProcessGuards() {
   })
 }
 
-module.exports = { state, clearRef, BOOT, bootMark, logWriter, logEvent, installProcessGuards, LOG_LEVEL, shouldLog, getMinLogLevel }
+module.exports = { state, clearRef, bootMark, bootElapsed, logWriter, logEvent, installProcessGuards, LOG_LEVEL, shouldLog, getMinLogLevel }

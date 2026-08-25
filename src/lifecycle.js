@@ -3,10 +3,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { app, globalShortcut, dialog, session, shell } = require('electron')
-const { join } = require('node:path')
 const fs = require('node:fs')
 const { state, clearRef, logEvent, logWriter, bootMark } = require('./state')
-const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, todayStamp, logDirPath, appRootDir } = require('./constants')
+const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, logFilePath, appRootDir } = require('./constants')
 const { store } = require('./store')
 const { applyAutoStart, isLaunchedByAutostart } = require('./autostart')
 const { registerIpcHandlers, registerGlobalShortcut } = require('./ipc')
@@ -49,7 +48,7 @@ async function requestRestart() {
   if (state.isQuitting) { logEvent('restart.request.duplicate'); return }
   state.isQuitting = true
   const t0 = Date.now()
-  const { realExePath, mode } = require('./runtime')
+  const { realExePath, mode } = require('./env')
   logEvent('restart.request', {
     cause: 'requestRestart',
     mode: mode(),
@@ -98,21 +97,20 @@ async function showFatalAndQuit(error) {
   await requestQuit()
 }
 
-async function openTodayLog() {
-  const safeStamp = todayStamp()
-  const target = join(logDirPath(), `host-${safeStamp}.log`)
+async function openLogFile() {
+  const target = logFilePath()
   try {
     if (!fs.existsSync(target)) {
       fs.mkdirSync(logDirPath(), { recursive: true })
-      fs.writeFileSync(target, `# host-${safeStamp}.log — 暂无输出\n# 日志目录：${logDirPath()}\n`, 'utf-8')
+      fs.writeFileSync(target, '', 'utf-8')
     }
   } catch (err) {
-    console.error('[logs] touch today 失败：', err)
-    logEvent('logs.touch-today.fail', { stamp: safeStamp, target, err }, 'error')
+    console.error('[logs] touch log file 失败：', err)
+    logEvent('logs.touch-log.fail', { target, err }, 'error')
   }
   const result = await shell.openPath(target)
-  if (result) logEvent('logs.open-today.fail', { stamp: safeStamp, target, error: result }, 'error')
-  else logEvent('logs.open-today.ok', { stamp: safeStamp, target })
+  if (result) logEvent('logs.open-log.fail', { target, error: result }, 'error')
+  else logEvent('logs.open-log.ok', { target })
 }
 
 async function bootstrap() {
@@ -177,10 +175,10 @@ async function bootstrap() {
     createTrayAndMenu({
       onShowMain: showWindow,
       onSettings: createSettingsWindow,
-      onOpenLogs: openTodayLog,
+      onOpenLogs: openLogFile,
       onRestart: requestRestart,
       onQuit: requestQuit,
-    }, logEvent)
+    })
     logEvent('bootstrap.trayMenu.create.ok')
     registerGlobalShortcut(shortcut)
     bootMark('tray + shortcut ready')
@@ -193,6 +191,19 @@ async function bootstrap() {
   if (state.isQuitting) return
   await navigateMainWindow()
   await trayP
+
+  // 首次启动：自动弹出设置窗口，引导用户检查系统环境
+  // 如果 host 未就绪（dsh 未安装），不弹错误对话框，设为首选方式
+  if (!store.get('ui.setupDone', false)) {
+    logEvent('bootstrap.first-launch.setup-open')
+    // 延迟一小段时间，确保主窗口和托盘都已就绪
+    setTimeout(() => {
+      try { createSettingsWindow() } catch (e) {
+        logEvent('bootstrap.first-launch.settings.fail', { err: e }, 'error')
+      }
+    }, 800)
+  }
+
   const totalTook = bootMark('bootstrap done')
   logEvent('bootstrap.done', { tookMs: totalTook, uptimeSec: Math.round(process.uptime() * 1000) / 1000 })
 }

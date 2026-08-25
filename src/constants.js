@@ -2,7 +2,7 @@
 // 常量与纯工具函数（无副作用，可被任意模块安全引用）
 // ═══════════════════════════════════════════════════════════════
 
-const { join } = require('node:path')
+const { dirname, join } = require('node:path')
 
 const APP_NAME = 'DeepSeek Harness'
 const APP_USER_MODEL_ID = 'ai.deepseek.harness.desktop'
@@ -29,32 +29,36 @@ const IS_MAC = process.platform === 'darwin'
 
 const AUTOSTART_ARG = '--from-autostart'
 
-function pad2(n) { return String(n).padStart(2, '0') }
-function todayStamp(d = new Date()) {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-}
-
-// 数据根目录：所有数据（日志/配置/runtime）都放在 exe 旁边
-// 打包后：exe 所在目录；开发模式：项目根目录（process.cwd()）
-// 便携版：electron-builder 会把 app 解压到 %TEMP% 临时目录运行，
-// 该目录每次启动都会变，不能作为数据根目录。
-// process.env.PORTABLE_EXECUTABLE_DIR 才是用户双击的 exe 所在目录（稳定）。
+// 开发模式数据根目录：项目根目录（process.cwd()）
+// 打包后：exe 所在目录（便携版用 PORTABLE_EXECUTABLE_DIR）
+// 仅开发模式使用，打包后数据走 dsh 插件标准路径
 function appRootDir() {
-  return require('./runtime').dataRootDir()
+  const { app } = require('electron')
+  if (app.isPackaged) {
+    return process.env.PORTABLE_EXECUTABLE_DIR || dirname(app.getPath('exe'))
+  }
+  return process.cwd()
 }
 
-function logDirPath() { return join(appRootDir(), 'logs') }
-function logFilePath(d = new Date()) { return join(logDirPath(), `host-${todayStamp(d)}.log`) }
-function recentLogDates(days = 7) {
-  const out = []
-  const base = new Date()
-  for (let i = 0; i < days; i++) {
-    const d = new Date(base)
-    d.setDate(base.getDate() - i)
-    out.push(todayStamp(d))
-  }
-  return out
+const { dshHomePath } = require('./dsh-home')
+
+// 日志路径：遵循 dsh-plugin-open-with 标准
+//   - 开发模式：项目根目录
+//   - 安装模式：$DSH_HOME/logs/deepseek-harness-desktop/
+function logDirPath() {
+  if (require('./env').mode() === 'dev') return appRootDir()
+  return dshHomePath('logs', 'deepseek-harness-desktop')
 }
+function logFilePath() { return join(logDirPath(), 'host.log') }
+
+// 配置文件路径：遵循 dsh 插件标准
+//   - 开发模式：项目根目录
+//   - 安装模式：$DSH_HOME/storages/deepseek-harness-desktop/
+function configDirPath() {
+  if (require('./env').mode() === 'dev') return appRootDir()
+  return dshHomePath('storages', 'deepseek-harness-desktop')
+}
+function configFilePath() { return join(configDirPath(), 'config.json') }
 
 // 主窗口加载后注入的 JS：悬浮标题栏拖拽（纯 DOM 事件 → IPC → 主进程 setBounds）。
 // 不用 -webkit-app-region（会吞掉指针事件，且在 Windows 无边框窗口下命中矩形错位，
@@ -178,6 +182,6 @@ module.exports = {
   DEFAULT_SHORTCUT, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT,
   MAIN_WIN, SETTINGS_WIN,
   IS_WIN, IS_MAC, AUTOSTART_ARG,
-  todayStamp, appRootDir, logDirPath, logFilePath, recentLogDates,
+  appRootDir, dshHomePath, logDirPath, logFilePath, configFilePath,
   INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 }

@@ -1,17 +1,93 @@
 // ═══════════════════════════════════════════════════════════════
-// 托盘与托盘菜单（electron-menubar 封装）
+// 托盘 + 托盘菜单（electron-menubar 封装）
+// 菜单视觉层（HTML/尺寸/preload 常量）与窗口管理都在本文件。
+//
+// 注意：修改下方 CSS/MENU_HEIGHT 时请同步更新 MENU_HEIGHT 计算。
 // ═══════════════════════════════════════════════════════════════
 
+const { join } = require('node:path')
 const { nativeImage, ipcMain, screen } = require('electron')
 const { menubar } = require('electron-menubar')
 const { state, logEvent } = require('./state')
 const { APP_NAME, ICON_PATH, IS_WIN } = require('./constants')
-const {
-  MENU_HTML: TRAY_MENU_HTML,
-  PRELOAD_PATH: TRAY_MENU_PRELOAD,
-  MENU_WIDTH: TRAY_MENU_WIDTH,
-  MENU_HEIGHT: TRAY_MENU_HEIGHT,
-} = require('./tray-menu')
+
+// ── 托盘菜单：常量 + 内联 HTML ──
+
+const PRELOAD_PATH = join(__dirname, '..', 'preload', 'preload-tray.js')
+
+// 菜单外框尺寸（必须与下方 HTML/CSS 保持一致）
+const MENU_WIDTH = 160
+const MENU_PADDING = 4          // .menu padding（对称）
+const MENU_ITEM_HEIGHT = 30     // .item height
+const MENU_GAP = 2              // .item gap
+const MENU_SEPARATOR_HEIGHT = 9 // .sep（1px 线 + 上下 margin 各 4）
+const MENU_BORDER = 2           // 上下 border 各 1
+
+// 行序：打开主窗口 / 偏好设置 / 查看日志 / 分隔线 / 重启 / 退出（共 5 项 + 1 分隔线）
+const MENU_HEIGHT = MENU_PADDING * 2
+  + MENU_ITEM_HEIGHT * 5
+  + MENU_GAP * 5
+  + MENU_SEPARATOR_HEIGHT
+  + MENU_BORDER
+
+const MENU_HTML = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: transparent; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 13px;
+    color: #1f2329;
+  }
+  .menu {
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, .12);
+    border-radius: 6px;
+    padding: ${MENU_PADDING}px;
+    display: flex;
+    flex-direction: column;
+    gap: ${MENU_GAP}px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .item {
+    height: ${MENU_ITEM_HEIGHT}px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: 4px;
+    cursor: default;
+  }
+  .item:hover { background: #eef0f3; }
+  .item:active { background: #e2e5ea; }
+  .sep { height: 1px; background: #e5e6e8; margin: 4px 8px; }
+</style>
+</head>
+<body>
+  <div class="menu">
+    <div class="item" data-action="show">打开主窗口</div>
+    <div class="item" data-action="settings">偏好设置</div>
+    <div class="item" data-action="logs">查看日志</div>
+    <div class="sep"></div>
+    <div class="item" data-action="restart">重启</div>
+    <div class="item" data-action="quit">退出</div>
+  </div>
+  <script>
+    document.querySelectorAll('.item').forEach(function(el) {
+      el.addEventListener('click', function() {
+        var action = this.getAttribute('data-action')
+        if (action) window.electronAPI.ipc.send('tray-menu-select', action)
+      })
+    })
+  </script>
+</body>
+</html>`
 
 function trayImage() {
   const image = nativeImage.createFromPath(ICON_PATH)
@@ -31,12 +107,12 @@ function trayImage() {
  * 直接用鼠标位置定位：菜单左边缘在鼠标右侧，底边缘在鼠标上方，
  * 即菜单出现在鼠标的右上角。
  */
-function createTrayAndMenu(callbacks, _logEvent) {
-  _logEvent('tray.create.start')
+function createTrayAndMenu(callbacks) {
+  logEvent('tray.create.start')
   const { onShowMain, onSettings, onOpenLogs, onRestart, onQuit } = callbacks
 
   ipcMain.on('tray-menu-select', (_e, action) => {
-    _logEvent('ipc.tray-menu-select', { action })
+    logEvent('ipc.tray-menu-select', { action })
     state.trayMenu?.hide?.()
     const fn = { show: onShowMain, settings: onSettings,
       logs: onOpenLogs, restart: onRestart, quit: onQuit }[action]
@@ -44,25 +120,25 @@ function createTrayAndMenu(callbacks, _logEvent) {
     try {
       const r = fn()
       if (r && typeof r.catch === 'function')
-        r.catch((err) => _logEvent(`action.${action}.fail`, { err }, 'error'))
+        r.catch((err) => logEvent(`action.${action}.fail`, { err }, 'error'))
     } catch (err) {
-      _logEvent(`action.${action}.throw`, { err }, 'error')
+      logEvent(`action.${action}.throw`, { err }, 'error')
     }
   })
 
   const mb = menubar({
     icon: trayImage(),
     tooltip: APP_NAME,
-    index: `data:text/html;charset=utf-8,${encodeURIComponent(TRAY_MENU_HTML)}`,
+    index: `data:text/html;charset=utf-8,${encodeURIComponent(MENU_HTML)}`,
     preloadWindow: true,
     windowPosition: IS_WIN ? 'trayBottomCenter' : 'trayCenter',
     browserWindow: {
-      width: TRAY_MENU_WIDTH, height: TRAY_MENU_HEIGHT,
+      width: MENU_WIDTH, height: MENU_HEIGHT,
       frame: false, transparent: true, resizable: false, movable: false,
       skipTaskbar: true, alwaysOnTop: true, focusable: true,
       fullscreenable: false, hasShadow: false, backgroundColor: '#00000000',
       webPreferences: {
-        preload: TRAY_MENU_PRELOAD,
+        preload: PRELOAD_PATH,
         contextIsolation: true, nodeIntegration: false, sandbox: true,
       },
     },
@@ -70,8 +146,8 @@ function createTrayAndMenu(callbacks, _logEvent) {
 
   mb.on('after-create-window', () => {
     try { mb.window?.setAlwaysOnTop?.(true, 'screen-saver') }
-    catch (err) { _logEvent('menubar.topmost.fail', { err }, 'warn') }
-    _logEvent('menubar.window.created', { id: mb.window?.id })
+    catch (err) { logEvent('menubar.topmost.fail', { err }, 'warn') }
+    logEvent('menubar.window.created', { id: mb.window?.id })
 
     // monkey-patch: electron-menubar 在 Windows 下每次 showWindow 都会调用
     // applyWindowPosition → getWindowPosition() 覆盖 windowPosition 为
@@ -82,57 +158,57 @@ function createTrayAndMenu(callbacks, _logEvent) {
       if (mp && mb.window && !mb.window.isDestroyed()) {
         try {
           const menuX = Math.round(mp.x)
-          const menuY = Math.round(mp.y - TRAY_MENU_HEIGHT)
+          const menuY = Math.round(mp.y - MENU_HEIGHT)
           mb.window.setPosition(menuX, menuY)
         } catch (err) {
-          _logEvent('menubar.reposition.fail', { err }, 'warn')
+          logEvent('menubar.reposition.fail', { err }, 'warn')
         }
       }
     }
   })
-  mb.on('show', () => _logEvent('menubar.show'))
-  mb.on('hide', () => _logEvent('menubar.hide'))
+  mb.on('show', () => logEvent('menubar.show'))
+  mb.on('hide', () => logEvent('menubar.hide'))
 
   state.trayMenu = {
     show: (bounds) => {
       state.trayMenu._mousePos = screen.getCursorScreenPoint()
       return mb.showWindow(bounds)
     },
-    hide: () => { try { mb.hideWindow() } catch (e) { _logEvent('menubar.hide.fail', { err: e }, 'warn') } },
+    hide: () => { try { mb.hideWindow() } catch (e) { logEvent('menubar.hide.fail', { err: e }, 'warn') } },
     destroy: () => {
       try { mb.window?.isDestroyed?.() || mb.window?.destroy?.() } catch {}
       try { mb.tray?.destroy?.() } catch {}
     },
   }
-  _logEvent('menubar.create.ok')
+  logEvent('menubar.create.ok')
 
   mb.on('ready', () => {
     const tray = mb.tray
     state.tray = tray
-    _logEvent('menubar.ready', { trayExists: Boolean(tray) })
+    logEvent('menubar.ready', { trayExists: Boolean(tray) })
     if (!tray) return
 
     tray.removeAllListeners('click')
     tray.removeAllListeners('right-click')
 
     tray.on('click', (_e, bounds) => {
-      _logEvent('tray.click', { bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null })
+      logEvent('tray.click', { bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null })
       try {
         const { showWindow } = require('./windows')
         showWindow()
-      } catch (err) { _logEvent('tray.click.showWindow.fail', { err }, 'error') }
+      } catch (err) { logEvent('tray.click.showWindow.fail', { err }, 'error') }
     })
     tray.on('right-click', (_e, bounds) => {
-      _logEvent('tray.right-click', {
+      logEvent('tray.right-click', {
         bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null,
       })
       state.trayMenu?.show?.(bounds)
     })
-    tray.on('double-click', () => _logEvent('tray.double-click'))
-    tray.on('destroy', () => _logEvent('tray.destroy', { isQuitting: state.isQuitting }, state.isQuitting ? 'info' : 'warn'))
-    tray.on('balloon-show', () => _logEvent('tray.balloon-show'))
-    tray.on('balloon-click', () => _logEvent('tray.balloon-click'))
-    tray.on('balloon-closed', () => _logEvent('tray.balloon-closed'))
+    tray.on('double-click', () => logEvent('tray.double-click'))
+    tray.on('destroy', () => logEvent('tray.destroy', { isQuitting: state.isQuitting }, state.isQuitting ? 'info' : 'warn'))
+    tray.on('balloon-show', () => logEvent('tray.balloon-show'))
+    tray.on('balloon-click', () => logEvent('tray.balloon-click'))
+    tray.on('balloon-closed', () => logEvent('tray.balloon-closed'))
   })
 }
 

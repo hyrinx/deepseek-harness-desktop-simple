@@ -15,7 +15,21 @@ contextBridge.exposeInMainWorld('settingsAPI', {
 contextBridge.exposeInMainWorld('logsAPI', {
   getInfo: () => ipcRenderer.invoke('logs:get-info'),
   openFolder: () => ipcRenderer.invoke('logs:open-folder'),
-  openFile: (stamp) => ipcRenderer.invoke('logs:open-file', stamp),
-  tail: (stamp, maxChars) => ipcRenderer.invoke('logs:tail', stamp, maxChars),
-  deleteFile: (stamp) => ipcRenderer.invoke('logs:delete-file', stamp),
+  openFile: () => ipcRenderer.invoke('logs:open-file'),
+  tail: (maxChars) => ipcRenderer.invoke('logs:tail', maxChars),
+  clear: () => ipcRenderer.invoke('logs:clear'),
+})
+
+contextBridge.exposeInMainWorld('envAPI', {
+  checkNode: () => ipcRenderer.invoke('env:check-node'),
+  checkNpm: () => ipcRenderer.invoke('env:check-npm'),
+  checkDsh: () => ipcRenderer.invoke('env:check-dsh'),
+  checkPlugin: () => ipcRenderer.invoke('env:check-plugin'),
+  updateNpm: () => ipcRenderer.invoke('env:update-npm'),
+  updateDsh: () => ipcRenderer.invoke('env:update-dsh'),
+  updatePlugin: () => ipcRenderer.invoke('env:update-plugin'),
+})
+
+contextBridge.exposeInMainWorld('setupAPI', {
+  markDone: () => ipcRenderer.invoke('setup:mark-done'),
 })
