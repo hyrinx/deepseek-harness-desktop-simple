@@ -5,7 +5,7 @@
 const { spawn } = require('node:child_process')
 const { app } = require('electron')
 const { state, logEvent, logWriter, bootMark } = require('./state')
-const { IS_WIN, IS_LINUX, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT } = require('./constants')
+const { IS_WIN, IS_LINUX, IS_MAC, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT } = require('./constants')
 
 function spawnDshWeb() {
   bootMark('spawn dsh web')
@@ -17,6 +17,9 @@ function spawnDshWeb() {
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
     shell: IS_WIN,
+    // 非 Windows 下让子进程成为独立进程组组长，使 killHostTree 的
+    // process.kill(-pid) 能整组终止（否则 -pid 指向不存在的进程组，会抛 ESRCH）
+    detached: !IS_WIN,
   }
   const child = spawn(cmd, args, opts)
   child.once('spawn', () => {
@@ -80,22 +83,36 @@ function appendHostTail(chunk) {
   state.hostStdoutTail = `${state.hostStdoutTail}${chunk}`.slice(-HOST_STDOUT_TAIL_LIMIT)
 }
 
+// 兜底强杀：SIGTERM 后 2s 仍存活则升级 SIGKILL（进程组或单进程），避免忽略 SIGTERM 的进程残留
+function escalateKill(child, pidTarget) {
+  const t = setTimeout(() => {
+    if (!child || child.killed) return
+    try {
+      if (pidTarget) process.kill(pidTarget, 'SIGKILL')
+      else child.kill('SIGKILL')
+    } catch { /* 进程已退出 */ }
+  }, 2000)
+  if (t.unref) t.unref()
+}
+
 function killHostTree(child) {
   if (!child || child.killed) return
   if (IS_WIN && child.pid) {
     try {
       spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true })
       return
-    } catch { /* fallback 到 child.kill */ }
+    } catch { /* 回退到下方单进程强杀 */ }
   }
-  // Linux/macOS：先尝试杀死进程组，失败则回退到单进程 kill
-  if (IS_LINUX && child.pid) {
+  // Linux/macOS：优先杀进程组（spawn 已 detached，-pid 指向进程组）；进程组不存在则回退单进程
+  if ((IS_LINUX || IS_MAC) && child.pid) {
     try {
       process.kill(-child.pid, 'SIGTERM')
+      escalateKill(child, -child.pid)
       return
-    } catch { /* fallback 到 child.kill */ }
+    } catch { /* 进程组不存在 → 回退单进程 */ }
   }
   child.kill('SIGTERM')
+  escalateKill(child, null)
 }
 
 function waitForHostReady(child) {

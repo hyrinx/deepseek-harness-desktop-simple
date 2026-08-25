@@ -15,8 +15,9 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 | 桌面框架 | Electron 43 |
 | 主进程 | Node.js (CommonJS) |
 | 渲染进程 | 原生 HTML/CSS/JS（零框架） |
-| 打包 | electron-builder (NSIS + Portable / AppImage + deb + rpm) |
-| 平台 | Windows (x64) / Linux (x64) |
+| 打包 | electron-builder (NSIS + Portable / AppImage + deb + rpm / DMG + zip) |
+| 平台 | Windows (x64) / Linux (x64) / macOS (x64 + arm64) |
+| CI/CD | GitHub Actions (push 构建验证 / tag 自动发布) |
 
 ## 项目结构
 

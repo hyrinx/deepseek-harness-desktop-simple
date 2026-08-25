@@ -8,7 +8,7 @@ release/
 
 # ── 运行产物 ─────────────────────────────────────────────
 *.log
-*.json
+config.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

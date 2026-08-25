@@ -5,8 +5,11 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux"
+    "build": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
+    "build:win": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
+    "build:linux": "set NODE_OPTIONS=--use-system-ca && electron-builder --linux",
+    "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac",
+    "generate:icns": "node scripts/generate-icns.js"
   },
   "build": {
     "appId": "com.hyrinx.deepseek-harness-desktop-simple",
@@ -26,11 +29,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/app.ico"
@@ -48,29 +55,67 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "icon": "assets/app.ico",
+      "icon": "assets/favicon.svg",
+      "desktopName": "DeepSeek Harness Desktop Simple",
+      "syncDesktopName": true,
       "category": "Utility",
       "maintainer": "Hyrinx",
       "synopsis": "DeepSeek Harness 轻量桌面包装",
       "description": "基于 Electron 的 DeepSeek Harness 轻量桌面壳，Native-First 架构。"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/app.icns",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "此应用不需要麦克风权限",
+        "NSCameraUsageDescription": "此应用不需要摄像头权限"
+      }
     }
   },
   "author": "Hyrinx",
   "license": "MIT",
   "devDependencies": {
+    "decode-ico": "^0.4.1",
     "electron": "^43.4.1",
-    "electron-builder": "^26.15.7"
+    "electron-builder": "^26.15.7",
+    "sharp": "^0.35.3"
   },
   "dependencies": {
     "electron-menubar": "^10.2.1"

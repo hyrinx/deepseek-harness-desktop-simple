@@ -131,7 +131,10 @@ async function updatePlugin() {
           return resolve({ ok: false, error: err.message, output: out, beforeVer, afterVer: '' })
         }
         require('./state').logEvent('env.update-plugin.ok', { beforeVer })
-        resolve({ ok: true, error: '', output: out, beforeVer, afterVer: '' })
+        // 安装成功后回查实际版本，回填 afterVer 供 UI 展示更新结果
+        checkPlugin()
+          .then((r) => resolve({ ok: true, error: '', output: out, beforeVer, afterVer: r.installed ? r.version : '' }))
+          .catch(() => resolve({ ok: true, error: '', output: out, beforeVer, afterVer: '' }))
       })
   })
 }
