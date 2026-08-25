@@ -9,7 +9,7 @@ const { AUTOSTART_ARG } = require('./constants')
 
 function applyAutoStart(enabled) {
   try {
-    const { realExePath } = require('./runtime')
+    const { realExePath } = require('./env')
     const exe = realExePath()
     app.setLoginItemSettings({
       openAtLogin: app.isPackaged && enabled,

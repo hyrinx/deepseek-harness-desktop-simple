@@ -4,59 +4,128 @@
 <meta charset="utf-8">
 <title>设置 - DeepSeek Harness</title>
 <style>
-  /* ════════════════════════════════════════════
+  /* ════════════════════════════════════════════════
    * Settings 样式：单文件内联，零外部依赖
-   * 结构：页面布局 / 卡片 / 快捷键录制框 /
-   *       按钮 / 关于列表 / Toast
-   * ════════════════════════════════════════════ */
+   * 结构：全局变量 / 布局 / 标签页 / 卡片 /
+   *       环境检查卡片 / 快捷键录制 / 开关 /
+   *       关于 / Toast / 动画
+   * ════════════════════════════════════════════════ */
+  :root {
+    --blue: #1677ff;
+    --blue-bg: #f0f7ff;
+    --blue-border: #91caff;
+    --green: #00b42a;
+    --green-bg: #f0fff4;
+    --green-border: #b7eb8f;
+    --red: #f53f3f;
+    --red-bg: #fff1f0;
+    --red-border: #ffa39e;
+    --orange: #ff7d00;
+    --orange-bg: #fff7e8;
+    --orange-border: #ffd591;
+    --gray-50: #fafbfc;
+    --gray-100: #f7f8fa;
+    --gray-200: #f2f3f5;
+    --gray-300: #ebeef0;
+    --gray-400: #e5e6e8;
+    --gray-500: #d9dbe0;
+    --gray-600: #b0b4bd;
+    --gray-700: #8a8f99;
+    --gray-800: #4e5969;
+    --gray-900: #1f2329;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-card-hover: 0 4px 12px rgba(0,0,0,.08);
+    --transition: .2s cubic-bezier(.4,0,.2,1);
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
     font-size: 13px;
-    color: #1f2329;
-    background: #fafbfc;
+    color: var(--gray-900);
+    background: linear-gradient(135deg, #f5f7fa 0%, #eef1f5 100%);
     -webkit-font-smoothing: antialiased;
+    overflow: hidden;
   }
 
-  .page { padding: 20px 24px; }
+  /* ── 页面容器 ── */
+  .page {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── 顶部标题栏 ── */
+  .header {
+    flex-shrink: 0;
+    padding: 16px 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .header-logo {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #1677ff 0%, #4dabf7 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--gray-900);
+    letter-spacing: -.01em;
+  }
+  .header-sub {
+    font-size: 11px;
+    color: var(--gray-700);
+    margin-left: 4px;
+    font-weight: 400;
+  }
 
   /* ── 标签页导航 ── */
   .tabs {
+    flex-shrink: 0;
     display: flex;
-    gap: 0;
-    margin-bottom: 16px;
-    border-bottom: 1px solid #ebeef0;
+    gap: 4px;
+    margin: 14px 20px 0;
+    padding: 4px;
+    background: var(--gray-200);
+    border-radius: var(--radius);
   }
   .tab-btn {
+    flex: 1;
     position: relative;
-    padding: 8px 18px;
+    padding: 8px 12px;
     border: none;
-    background: none;
-    font-size: 13px;
+    background: transparent;
+    font-size: 12.5px;
     font-weight: 500;
-    color: #8a8f99;
+    color: var(--gray-700);
     cursor: pointer;
     font-family: inherit;
-    transition: color .15s;
+    border-radius: 7px;
+    transition: all var(--transition);
     white-space: nowrap;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
   }
-  .tab-btn:hover { color: #4e5969; }
+  .tab-btn:hover { color: var(--gray-800); background: rgba(0,0,0,.04); }
   .tab-btn.active {
-    color: #1677ff;
-  }
-  .tab-btn.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: #1677ff;
-    border-radius: 1px 1px 0 0;
+    color: var(--blue);
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
   }
   .tab-icon {
     width: 14px; height: 14px;
@@ -64,26 +133,171 @@
   }
 
   /* ── 标签内容面板 ── */
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 20px 20px;
+  }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
   /* ── 卡片容器 ── */
   .card {
     background: #fff;
-    border: 1px solid #ebeef0;
-    border-radius: 8px;
-    margin-bottom: 14px;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--transition);
     overflow: hidden;
   }
+  .card:hover { box-shadow: var(--shadow-card-hover); }
   .card-title {
     padding: 12px 16px;
     font-size: 13px;
     font-weight: 600;
-    color: #1f2329;
-    border-bottom: 1px solid #f2f3f5;
-    background: #fcfcfd;
+    color: var(--gray-900);
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-50);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .icon-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--blue);
+    flex-shrink: 0;
   }
   .card-body { padding: 16px; }
+
+  /* ── 环境检查行 ── */
+  .env-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .env-row:last-child { border-bottom: none; }
+  .env-icon {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .env-icon.node { background: linear-gradient(135deg, #539e43 0%, #6cc24a 100%); }
+  .env-icon.npm { background: linear-gradient(135deg, #cb3837 0%, #e53e3e 100%); }
+  .env-icon.dsh { background: linear-gradient(135deg, #1677ff 0%, #4dabf7 100%); }
+  .env-info { flex: 1; min-width: 0; }
+  .env-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 2px;
+  }
+  .env-status {
+    font-size: 11.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .env-status .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.err { background: var(--red); }
+  .status-dot.loading {
+    background: var(--blue);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .env-version {
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    font-size: 12px;
+    color: var(--gray-700);
+    background: var(--gray-100);
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    min-width: 60px;
+    text-align: center;
+  }
+  .env-version.loading {
+    color: var(--gray-600);
+  }
+  .env-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 6px;
+  }
+
+  /* ── 通用按钮 ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--gray-500);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    font-size: 12px;
+    color: var(--gray-800);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) {
+    color: var(--blue);
+    border-color: var(--blue);
+    background: var(--blue-bg);
+  }
+  .btn:active:not(:disabled) { background: #e6f0ff; }
+  .btn:disabled {
+    cursor: not-allowed;
+    color: var(--gray-600);
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+    opacity: .7;
+  }
+  .btn-primary {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #4096ff;
+    border-color: #4096ff;
+    color: #fff;
+  }
+  .btn-primary:active:not(:disabled) { background: #0958d9; }
+  .btn-primary:disabled {
+    background: var(--gray-400);
+    border-color: var(--gray-400);
+    color: #fff;
+    opacity: .7;
+  }
+  .btn-sm {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+  .btn-icon {
+    width: 12px; height: 12px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    flex-shrink: 0;
+  }
 
   /* ── 快捷键行 ── */
   .shortcut-row {
@@ -91,17 +305,18 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    flex-wrap: wrap;
   }
-  .shortcut-info { flex: 1; min-width: 0; }
+  .shortcut-info { flex: 1; min-width: 180px; }
   .shortcut-name {
     font-size: 13px;
     font-weight: 500;
-    color: #1f2329;
+    color: var(--gray-900);
     margin-bottom: 4px;
   }
   .shortcut-desc {
     font-size: 12px;
-    color: #8a8f99;
+    color: var(--gray-700);
     line-height: 1.5;
   }
   .shortcut-actions {
@@ -111,7 +326,7 @@
     flex-shrink: 0;
   }
 
-  /* ── 快捷键录制框（仿 Antd ShortcutRecorder 视觉） ── */
+  /* ── 快捷键录制框 ── */
   .recorder {
     position: relative;
     display: inline-block;
@@ -135,8 +350,8 @@
     width: 100%;
     height: 30px;
     background: #fff;
-    border: 1px solid #d9dbe0;
-    border-radius: 6px;
+    border: 1px solid var(--gray-500);
+    border-radius: var(--radius-sm);
     padding: 0 11px;
     font-family: inherit;
     font-size: 13px;
@@ -144,12 +359,12 @@
     caret-color: transparent;
     cursor: pointer;
     outline: none;
-    transition: border-color .15s, box-shadow .15s;
+    transition: border-color var(--transition), box-shadow var(--transition);
   }
-  .recorder-input:hover { border-color: #b0b4bd; }
+  .recorder-input:hover { border-color: var(--gray-600); }
   .recorder-input:focus {
-    border-color: #1677ff;
-    box-shadow: 0 0 0 2px rgba(22,119,255,.1);
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(22,119,255,.12);
   }
   .recorder-label {
     position: absolute;
@@ -160,49 +375,16 @@
     pointer-events: none;
     white-space: pre;
     font-size: 13px;
-    color: #a0a3ab;
-    transition: color .15s;
+    color: var(--gray-600);
+    transition: color var(--transition);
   }
-  .recorder-label.has-value { color: #1677ff; font-weight: 600; }
-  .recorder-label.is-recording { color: #1677ff; }
-
-  /* ── 通用按钮 ── */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 30px;
-    padding: 0 12px;
-    border: 1px solid #d9dbe0;
-    border-radius: 6px;
-    background: #fff;
-    font-size: 12px;
-    color: #4e5969;
-    cursor: pointer;
-    transition: all .15s;
-    font-family: inherit;
-    gap: 4px;
-  }
-  .btn:hover:not(:disabled) {
-    color: #1677ff;
-    border-color: #1677ff;
-    background: #f0f7ff;
-  }
-  .btn:active:not(:disabled) { background: #e6f0ff; }
-  .btn:disabled {
-    cursor: not-allowed;
-    color: #b0b4bd;
-    background: #f5f6f7;
-    border-color: #e5e6e8;
-  }
-  .btn-icon {
-    width: 12px; height: 12px;
-    stroke: currentColor;
-    fill: none;
-    stroke-width: 2;
+  .recorder-label.has-value { color: var(--blue); font-weight: 600; }
+  .recorder-label.is-recording {
+    color: var(--blue);
+    animation: pulse-text 1.2s ease-in-out infinite;
   }
 
-  /* ── 通用设置行：label + 右侧控件 ── */
+  /* ── 通用设置行 ── */
   .setting-row {
     display: flex;
     align-items: flex-start;
@@ -214,25 +396,30 @@
   .setting-name {
     font-size: 13px;
     font-weight: 500;
-    color: #1f2329;
+    color: var(--gray-900);
     margin-bottom: 4px;
     line-height: 1.5;
   }
   .setting-desc {
     font-size: 12px;
-    color: #8a8f99;
+    color: var(--gray-700);
     line-height: 1.6;
   }
-  .setting-desc.warn { color: #f53f3f; }
-  .setting-control { flex-shrink: 0; display: flex; align-items: center; height: 30px; }
+  .setting-desc.warn { color: var(--red); }
+  .setting-control {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    height: 30px;
+  }
 
-  /* ── Switch 开关（仿 Antd，纯 CSS，基于 checkbox 受控） ── */
+  /* ── Switch 开关 ── */
   .switch {
     position: relative;
     display: inline-block;
-    width: 40px;
-    height: 22px;
-    line-height: 22px;
+    width: 42px;
+    height: 24px;
+    line-height: 24px;
   }
   .switch input {
     opacity: 0;
@@ -244,36 +431,30 @@
     position: absolute;
     cursor: pointer;
     inset: 0;
-    background-color: #d9dbe0;
-    border-radius: 22px;
-    transition: background-color .2s;
+    background-color: var(--gray-500);
+    border-radius: 24px;
+    transition: background-color var(--transition);
   }
   .switch-slider::before {
     content: '';
     position: absolute;
-    height: 18px;
-    width: 18px;
+    height: 20px;
+    width: 20px;
     left: 2px;
     top: 2px;
     background-color: #fff;
     border-radius: 50%;
-    transition: transform .2s, box-shadow .2s;
-    box-shadow: 0 2px 4px rgba(0,0,0,.2);
+    transition: transform var(--transition), box-shadow var(--transition);
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
   }
-  .switch input:checked + .switch-slider {
-    background-color: #1677ff;
-  }
-  .switch input:checked + .switch-slider::before {
-    transform: translateX(18px);
-  }
+  .switch input:checked + .switch-slider { background-color: var(--blue); }
+  .switch input:checked + .switch-slider::before { transform: translateX(18px); }
   .switch input:disabled + .switch-slider {
     cursor: not-allowed;
-    background-color: #e5e6e8;
+    background-color: var(--gray-400);
     opacity: .75;
   }
-  .switch input:disabled + .switch-slider::before {
-    background-color: #f7f8fa;
-  }
+  .switch input:disabled + .switch-slider::before { background-color: #f7f8fa; }
   .switch input:focus-visible + .switch-slider {
     outline: 2px solid rgba(22,119,255,.2);
     outline-offset: 2px;
@@ -283,173 +464,150 @@
   .about-list { list-style: none; }
   .about-list li {
     display: flex;
-    padding: 8px 0;
+    padding: 9px 0;
     font-size: 13px;
     line-height: 1.6;
-    border-bottom: 1px dashed #f2f3f5;
+    border-bottom: 1px solid var(--gray-200);
   }
   .about-list li:last-child { border-bottom: none; }
   .about-label {
-    width: 80px;
+    width: 72px;
     flex-shrink: 0;
-    color: #8a8f99;
+    color: var(--gray-700);
+    font-weight: 500;
   }
   .about-value {
     flex: 1;
-    color: #1f2329;
+    color: var(--gray-900);
     word-break: break-all;
   }
+  .about-value code {
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 12px;
+    background: var(--gray-100);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* ── 设置向导 Banner ── */
+  .setup-banner {
+    background: linear-gradient(135deg, #e8f3ff 0%, #f0f7ff 100%);
+    border: 1px solid var(--blue-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .setup-banner .banner-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .setup-banner .banner-text {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--gray-800);
+    line-height: 1.5;
+  }
+  .setup-banner .banner-text strong { color: var(--blue); }
 
   /* ── Toast 悬浮提示 ── */
   .toast {
     position: fixed;
-    top: 20px;
+    top: 16px;
     left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 12px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+    transform: translateX(-50%) translateY(-12px);
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 12.5px;
+    font-weight: 500;
+    box-shadow: 0 6px 20px rgba(0,0,0,.1);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s, transform .2s;
+    transition: opacity var(--transition), transform var(--transition);
     z-index: 1000;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    backdrop-filter: blur(8px);
   }
   .toast.show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
-  .toast.success { background: #f0fff4; color: #00b42a; border: 1px solid #b7eb8f; }
-  .toast.info    { background: #f0f7ff; color: #1677ff; border: 1px solid #91caff; }
-  .toast.error   { background: #fff1f0; color: #f53f3f; border: 1px solid #ffa39e; }
-  .toast-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .toast.success { background: rgba(240,255,244,.92); color: var(--green); border: 1px solid var(--green-border); }
+  .toast.info    { background: rgba(240,247,255,.92); color: var(--blue); border: 1px solid var(--blue-border); }
+  .toast.error   { background: rgba(255,241,240,.92); color: var(--red); border: 1px solid var(--red-border); }
+  .toast-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
-  /* ── 日志卡片 ── */
-  .log-path-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .log-path-label {
-    flex-shrink: 0;
-    font-size: 12px;
-    color: #8a8f99;
-  }
-  .log-path-value {
-    flex: 1;
-    min-width: 0;
-    padding: 6px 10px;
-    background: #f7f8fa;
-    border: 1px solid #e5e6e8;
-    border-radius: 6px;
-    font-size: 12px;
-    color: #4e5969;
-    font-family: Consolas, "Courier New", monospace;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .log-actions {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-  }
-  .log-file-list {
-    border: 1px solid #ebeef0;
-    border-radius: 6px;
-    overflow: hidden;
-    max-height: 220px;
-    overflow-y: auto;
-    margin-bottom: 12px;
-  }
-  .log-file-header,
-  .log-file-row {
-    display: grid;
-    grid-template-columns: 1fr 90px 150px 40px;
-    gap: 8px;
-    padding: 8px 12px;
-    align-items: center;
-  }
-  .log-file-header {
-    background: #f7f8fa;
-    font-size: 12px;
-    font-weight: 600;
-    color: #8a8f99;
-    border-bottom: 1px solid #ebeef0;
-    position: sticky;
-    top: 0;
-  }
-  .log-file-row {
-    font-size: 12px;
-    border-bottom: 1px solid #f2f3f5;
-    cursor: pointer;
-    transition: background .12s;
-  }
-  .log-file-row:last-child { border-bottom: none; }
-  .log-file-row:hover { background: #f7faff; }
-  .log-file-row.active {
-    background: #e6f0ff;
-    color: #1677ff;
-  }
-  .log-file-row.missing { color: #c9cdd4; font-style: italic; cursor: default; }
-  .log-file-row.missing:hover { background: transparent; }
-  .log-file-name {
-    font-family: Consolas, "Courier New", monospace;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .log-file-size { text-align: right; color: #8a8f99; }
-  .log-file-row.active .log-file-size { color: #1677ff; }
-  .log-file-time {
-    color: #8a8f99;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .log-file-row.active .log-file-time { color: #1677ff; }
-  .log-file-status {
-    text-align: center;
-    font-size: 11px;
-  }
-  .log-file-status .tag-today {
+  /* ── 加载旋转 ── */
+  .spin {
     display: inline-block;
-    padding: 1px 6px;
-    border-radius: 10px;
-    background: #e8f3ff;
-    color: #1677ff;
-    font-style: normal;
+    width: 14px; height: 14px;
+    border: 2px solid var(--gray-300);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* ── 更新输出日志区域 ── */
+  .update-log {
+    display: none;
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--gray-900);
+    color: #a8d8a8;
+    font-family: Consolas, "Cascadia Code", "Courier New", monospace;
+    font-size: 11px;
+    border-radius: var(--radius-sm);
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+  }
+  .update-log.show { display: block; }
+  .update-log.error { color: #ffa39e; }
+
+  /* ── 动画 ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .35; }
+  }
+  @keyframes pulse-text {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
   }
 </style>
 </head>
 <body>
 <div class="page">
 
+  <!-- ── 顶部标题栏 ── -->
+  <div class="header">
+    <div class="header-logo">DS</div>
+    <span class="header-title">DeepSeek Harness</span>
+    <span class="header-sub">设置</span>
+  </div>
+
   <!-- ── 标签页导航 ── -->
   <div class="tabs" id="tabNav">
-    <button class="tab-btn active" data-tab="general">
+    <button class="tab-btn active" data-tab="env">
       <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        <polyline points="4 17 10 11 4 5"></polyline>
+        <line x1="12" y1="19" x2="20" y2="19"></line>
+      </svg>
+      环境
+    </button>
+    <button class="tab-btn" data-tab="general">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
       </svg>
       常规
-    </button>
-    <button class="tab-btn" data-tab="logs">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-        <polyline points="14 2 14 8 20 8"></polyline>
-        <line x1="16" y1="13" x2="8" y2="13"></line>
-        <line x1="16" y1="17" x2="8" y2="17"></line>
-        <polyline points="10 9 9 9 8 9"></polyline>
-      </svg>
-      日志
     </button>
     <button class="tab-btn" data-tab="about">
       <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -461,134 +619,194 @@
     </button>
   </div>
 
-  <!-- ═════════════════════════════════════════════════
-     标签页 1：常规（开机自启 + 快捷键）
-     ═════════════════════════════════════════════════ -->
-  <div class="tab-panel active" id="tab-general">
+  <!-- ── 标签内容区 ── -->
+  <div class="tab-content">
 
-    <div class="card">
-      <div class="card-title">常规</div>
-      <div class="card-body">
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-name">开机自动启动</div>
-            <div class="setting-desc" id="autostartDesc">登录 Windows 时自动启动本应用（仅打包为 .exe 后可用）</div>
-          </div>
-          <div class="setting-control">
-            <label class="switch" id="autostartSwitchWrap">
-              <input type="checkbox" id="autostartInput" aria-label="开机自动启动开关">
-              <span class="switch-slider"></span>
-            </label>
-          </div>
-        </div>
+    <!-- ═══════════════════════════════════════════════
+        标签页 1：环境（Node.js / npm / dsh）
+        ═══════════════════════════════════════════════ -->
+    <div class="tab-panel active" id="tab-env">
+
+      <div class="setup-banner" id="setupBanner">
+        <span class="banner-icon">🛠️</span>
+        <span class="banner-text">
+          首次使用前请检查系统环境。<strong>Node.js</strong> 和 <strong>dsh</strong> 是运行 DeepSeek Harness 的必要条件。
+        </span>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="card-title">快捷键</div>
-      <div class="card-body">
-        <div class="shortcut-row">
-          <div class="shortcut-info">
-            <div class="shortcut-name">切换窗口显示 / 隐藏</div>
-            <div class="shortcut-desc">全局快捷键，在任何应用中都有效</div>
-          </div>
-          <div class="shortcut-actions">
-            <div class="recorder" id="shortcutRecorder">
-              <span class="recorder-sizer" id="recorderSizer" aria-hidden></span>
-              <input class="recorder-input" id="recorderInput" readonly />
-              <span class="recorder-label" id="recorderLabel">点击录制快捷键</span>
+      <div class="card">
+        <div class="card-title"><span class="icon-dot"></span>系统环境检查</div>
+        <div class="card-body">
+          <!-- Node.js -->
+          <div class="env-row">
+            <div class="env-icon node">N</div>
+            <div class="env-info">
+              <div class="env-name">Node.js 运行时</div>
+              <div class="env-status" id="nodeStatus">
+                <span class="status-dot loading"></span> 检测中...
+              </div>
             </div>
-            <button class="btn" id="resetBtn" title="恢复默认">
-              <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                <path d="M3 3v5h5"></path>
-              </svg>
-              重置
-            </button>
+            <span class="env-version loading" id="nodeVersion">-</span>
+            <div class="env-actions">
+              <button class="btn btn-sm" id="nodeRefreshBtn" disabled title="重新检测">
+                <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+              </button>
+            </div>
           </div>
+
+          <!-- npm -->
+          <div class="env-row">
+            <div class="env-icon npm">n</div>
+            <div class="env-info">
+              <div class="env-name">npm 包管理器</div>
+              <div class="env-status" id="npmStatus">
+                <span class="status-dot loading"></span> 检测中...
+              </div>
+            </div>
+            <span class="env-version loading" id="npmVersion">-</span>
+            <div class="env-actions">
+              <button class="btn btn-sm btn-primary" id="npmUpdateBtn" disabled title="更新到最新版">
+                <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                更新
+              </button>
+            </div>
+          </div>
+
+          <!-- dsh -->
+          <div class="env-row">
+            <div class="env-icon dsh">D</div>
+            <div class="env-info">
+              <div class="env-name">DeepSeek Harness CLI</div>
+              <div class="env-status" id="dshStatus">
+                <span class="status-dot loading"></span> 检测中...
+              </div>
+            </div>
+            <span class="env-version loading" id="dshVersion">-</span>
+            <div class="env-actions">
+              <button class="btn btn-sm btn-primary" id="dshUpdateBtn" disabled title="更新到最新版">
+                <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                更新
+              </button>
+            </div>
+          </div>
+
+          <!-- dsh 插件安装 -->
+          <div class="env-row">
+            <div class="env-icon" style="background:linear-gradient(135deg,#8b5cf6 0%,#a78bfa 100%);">P</div>
+            <div class="env-info">
+              <div class="env-name">dshmarket 插件</div>
+              <div class="env-status" id="dshPluginStatus">
+                <span class="status-dot loading"></span> 检测中...
+              </div>
+            </div>
+            <span class="env-version loading" id="dshPluginVersion">-</span>
+            <div class="env-actions">
+              <button class="btn btn-sm btn-primary" id="dshPluginBtn" disabled title="安装 dshmarket 插件">
+                <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                安装插件市场
+              </button>
+            </div>
+          </div>
+
+          <!-- 更新输出日志 -->
+          <div class="update-log" id="updateLog"></div>
         </div>
       </div>
-    </div>
 
-  </div>
-
-  <!-- ═════════════════════════════════════════════════
-     标签页 2：日志与排障
-     ═════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-logs">
-
-    <div class="card">
-      <div class="card-title">日志与排障</div>
-      <div class="card-body">
-        <div class="log-path-row">
-          <span class="log-path-label">日志目录</span>
-          <span class="log-path-value" id="logDirPath">-</span>
-        </div>
-
-        <div class="log-actions">
-          <button class="btn" id="logOpenFolderBtn" title="在资源管理器中打开日志目录">
-            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-            打开日志目录
-          </button>
-          <button class="btn" id="logOpenSelectedBtn" disabled title="用默认编辑器打开选中的日志文件">
-            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-            打开选中文件
-          </button>
-          <button class="btn" id="logDeleteSelectedBtn" disabled title="删除选中的日志文件（无法恢复）">
-            <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"></path>
-              <path d="M10 11v6M14 11v6"></path>
-              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            删除选中文件
-          </button>
-          <button class="btn" id="logRefreshBtn" title="刷新日志文件列表">
+      <!-- 全部检查通过 -->
+      <div class="card" style="text-align:center;">
+        <div class="card-body">
+          <button class="btn btn-primary" id="checkAllBtn" disabled>
             <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
             </svg>
-            刷新
+            重新检测全部
           </button>
         </div>
+      </div>
 
-        <div class="log-file-list">
-          <div class="log-file-header">
-            <div>文件</div>
-            <div style="text-align:right;">大小</div>
-            <div>修改时间</div>
-            <div style="text-align:center;">状态</div>
-          </div>
-          <div id="logFileListBody">
-            <!-- 运行时填充 -->
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+        标签页 2：常规（开机自启 + 快捷键）
+        ═══════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-general">
+
+      <div class="card">
+        <div class="card-title"><span class="icon-dot"></span>启动行为</div>
+        <div class="card-body">
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-name">开机自动启动</div>
+              <div class="setting-desc" id="autostartDesc">登录 Windows 时自动启动（仅打包 .exe 后可用）</div>
+            </div>
+            <div class="setting-control">
+              <label class="switch" id="autostartSwitchWrap">
+                <input type="checkbox" id="autostartInput" aria-label="开机自动启动开关">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-title"><span class="icon-dot"></span>快捷键</div>
+        <div class="card-body">
+          <div class="shortcut-row">
+            <div class="shortcut-info">
+              <div class="shortcut-name">切换窗口显示 / 隐藏</div>
+              <div class="shortcut-desc">全局快捷键，在任何应用中都有效</div>
+            </div>
+            <div class="shortcut-actions">
+              <div class="recorder" id="shortcutRecorder">
+                <span class="recorder-sizer" id="recorderSizer" aria-hidden></span>
+                <input class="recorder-input" id="recorderInput" readonly />
+                <span class="recorder-label" id="recorderLabel">点击录制快捷键</span>
+              </div>
+              <button class="btn btn-sm" id="resetBtn" title="恢复默认">
+                <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                  <path d="M3 3v5h5"></path>
+                </svg>
+                重置
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-  </div>
+    <!-- ═══════════════════════════════════════════════
+        标签页 3：关于
+        ═══════════════════════════════════════════════ -->
+    <div class="tab-panel" id="tab-about">
 
-  <!-- ═════════════════════════════════════════════════
-     标签页 3：关于
-     ═════════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-about">
-
-    <div class="card">
-      <div class="card-title">关于</div>
-      <div class="card-body">
-        <ul class="about-list">
-          <li><span class="about-label">应用名称</span><span class="about-value">DeepSeek Harness</span></li>
-          <li><span class="about-label">版本</span><span class="about-value" id="appVersion">0.1.0</span></li>
-          <li><span class="about-label">平台</span><span class="about-value" id="appPlatform">-</span></li>
-          <li><span class="about-label">说明</span><span class="about-value">DeepSeek 轻量桌面包装，基于 Electron</span></li>
-        </ul>
+      <div class="card">
+        <div class="card-title"><span class="icon-dot"></span>关于</div>
+        <div class="card-body">
+          <ul class="about-list">
+            <li><span class="about-label">应用名称</span><span class="about-value">DeepSeek Harness</span></li>
+            <li><span class="about-label">版本</span><span class="about-value"><code id="appVersion">0.1.0</code></span></li>
+            <li><span class="about-label">平台</span><span class="about-value"><code id="appPlatform">-</code></span></li>
+            <li><span class="about-label">说明</span><span class="about-value">DeepSeek 轻量桌面包装，基于 Electron</span></li>
+          </ul>
+        </div>
       </div>
+
     </div>
 
   </div>
@@ -602,13 +820,15 @@
    设置页渲染进程脚本（纯原生，零依赖）
    模块：
      1. 常量与快捷键映射
-     2. 工具函数（键盘 → Accelerator、显示格式化）
+     2. 工具函数
      3. Toast 提示
      4. IPC 桥接封装
-     5. DOM 引用与 state（状态集中管理）
-     6. 录制器状态机
-     7. 事件绑定
-     8. 启动初始化
+     5. DOM 引用与状态
+     6. 环境检查模块
+     7. 录制器状态机
+     8. 开机自启模块
+     9. 事件绑定
+     10. 启动初始化
    ═══════════════════════════════════════════════════════════════ */
 
 // ───────────────────────────────────────────────────────────
@@ -619,7 +839,6 @@ const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+Space'
 const PLACEHOLDER_IDLE = '点击录制快捷键'
 const PLACEHOLDER_REC  = '按下组合键...'
 
-// event.code → Electron Accelerator 键名
 const CODE_TO_KEY = Object.assign(Object.create(null), {
   Space: 'Space', Backspace: 'Backspace', Delete: 'Delete',
   Enter: 'Enter', Escape: 'Esc', Tab: 'Tab',
@@ -631,7 +850,6 @@ const CODE_TO_KEY = Object.assign(Object.create(null), {
   Comma: ',', Period: '.', Slash: '/',
 })
 
-// 显示友好名称
 const KEY_DISPLAY = Object.assign(Object.create(null), {
   Space: 'Space', Backspace: '⌫', Delete: 'Del', Enter: 'Enter',
   Escape: 'Esc', Tab: 'Tab',
@@ -646,16 +864,14 @@ const KEY_DISPLAY = Object.assign(Object.create(null), {
   Insert: 'Ins', CapsLock: 'Caps',
 })
 
-// 修饰符左右键归一化：e.code 给出的是 ShiftLeft/ControlRight 等，必须归一成标准名再参与判定
 const MODIFIER_NORMALIZE = Object.assign(Object.create(null), {
   ShiftLeft: 'Shift', ShiftRight: 'Shift',
   ControlLeft: 'Control', ControlRight: 'Control',
   AltLeft: 'Alt', AltRight: 'Alt',
   MetaLeft: 'Meta', MetaRight: 'Meta',
-  OSLeft: 'Meta', OSRight: 'Meta', // 个别平台键盘使用 OSLeft/OSRight
+  OSLeft: 'Meta', OSRight: 'Meta',
 })
 
-// 修饰符"标准名"集合（用于 modifier-only 判定和自动提交的末段判定）
 const PURE_MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta', 'CommandOrControl'])
 
 // ───────────────────────────────────────────────────────────
@@ -663,7 +879,6 @@ const PURE_MODIFIER_KEYS = new Set(['Control', 'Alt', 'Shift', 'Meta', 'CommandO
 // ───────────────────────────────────────────────────────────
 
 function codeToAccelKey(code) {
-  // 先处理左右修饰符归一化，避免 ShiftLeft/ControlRight 这种"未映射代码"直接流入
   const normalized = MODIFIER_NORMALIZE[code]
   if (normalized) return normalized
   if (code.startsWith('Key'))    return code.slice(3)
@@ -673,12 +888,6 @@ function codeToAccelKey(code) {
   return CODE_TO_KEY[code] || code
 }
 
-/**
- * 将 keydown 事件转换为 Electron Accelerator 字符串。
- * - modifier-only（只按 Ctrl/Shift/Alt）：返回 null，等待用户继续按键
- * - 非法组合（单个字母，无修饰）：返回 null
- * - Fn 单键：允许
- */
 function eventToAccelerator(e) {
   const modifiers = []
   if (e.ctrlKey || e.metaKey) modifiers.push('CommandOrControl')
@@ -691,7 +900,6 @@ function eventToAccelerator(e) {
   }
 
   modifiers.push(key)
-  // 合法组合：至少 2 段（修饰符 + 主键）或 Fn 单键
   if (/^F\d+$/.test(key) || modifiers.length >= 2) {
     return modifiers.join('+')
   }
@@ -704,16 +912,15 @@ function formatShortcut(raw) {
 }
 
 // ───────────────────────────────────────────────────────────
-// 3. Toast 封装（防抖动，连续调用覆盖前一次）
+// 3. Toast 封装
 // ───────────────────────────────────────────────────────────
 
 const Toast = (() => {
   const el = document.getElementById('toast')
   let timer = null
-  function show(msg, type = 'info', duration = 1800) {
+  function show(msg, type = 'info', duration = 2000) {
     el.className = 'toast ' + type
     el.innerHTML = '<span class="toast-dot"></span>' + msg
-    // 强制触发 CSS 过渡
     void el.offsetWidth
     el.classList.add('show')
     clearTimeout(timer)
@@ -727,7 +934,7 @@ const Toast = (() => {
 })()
 
 // ───────────────────────────────────────────────────────────
-// 4. IPC 桥接封装（catch 错误，统一 Toast）
+// 4. IPC 桥接封装
 // ───────────────────────────────────────────────────────────
 
 const IPC = {
@@ -736,29 +943,16 @@ const IPC = {
     catch (e) { console.warn('[ipc] getSettings 失败', e); return {} }
   },
   async setShortcut(name, value) {
-    try {
-      await window.settingsAPI.setShortcut(name, value)
-      return true
-    } catch (e) {
-      console.error('[ipc] setShortcut 失败', e)
-      Toast.error('保存失败')
-      return false
-    }
+    try { await window.settingsAPI.setShortcut(name, value); return true }
+    catch (e) { console.error('[ipc] setShortcut 失败', e); Toast.error('保存失败'); return false }
   },
   async getAutoStart() {
     try { return await window.settingsAPI.getAutoStart() }
-    catch (e) {
-      console.warn('[ipc] getAutoStart 失败', e)
-      return { enabled: false, available: false, actuallySet: false }
-    }
+    catch (e) { console.warn('[ipc] getAutoStart 失败', e); return { enabled: false, available: false, actuallySet: false } }
   },
   async setAutoStart(enabled) {
     try { return await window.settingsAPI.setAutoStart(enabled) }
-    catch (e) {
-      console.error('[ipc] setAutoStart 失败', e)
-      Toast.error('设置失败')
-      return null
-    }
+    catch (e) { console.error('[ipc] setAutoStart 失败', e); Toast.error('设置失败'); return null }
   },
   async fillAboutInfo() {
     const [platform, version] = await Promise.all([
@@ -772,31 +966,46 @@ const IPC = {
     try { window.settingsAPI.closeWindow() } catch {}
   },
 
-  // 日志
-  async logsGetInfo() {
-    try { return await window.logsAPI.getInfo() }
-    catch (e) { console.warn('[ipc] logsGetInfo 失败', e); return null }
+
+  // 环境检查
+  async checkNode() {
+    try { return await window.envAPI.checkNode() }
+    catch (e) { return { ok: false, error: String(e), version: '' } }
   },
-  async logsOpenFolder() {
-    try { return await window.logsAPI.openFolder() }
-    catch (e) { console.warn('[ipc] logsOpenFolder 失败', e); Toast.error('打开日志目录失败'); return false }
+  async checkNpm() {
+    try { return await window.envAPI.checkNpm() }
+    catch (e) { return { ok: false, error: String(e), version: '' } }
   },
-  async logsOpenFile(stamp) {
-    try { return await window.logsAPI.openFile(stamp) }
-    catch (e) { console.warn('[ipc] logsOpenFile 失败', e); return { ok: false, error: String(e) } }
+  async checkDsh() {
+    try { return await window.envAPI.checkDsh() }
+    catch (e) { return { ok: false, error: String(e), version: '' } }
   },
-  async logsTail(stamp, maxChars) {
-    try { return await window.logsAPI.tail(stamp, maxChars) }
-    catch (e) { return { ok: false, error: String(e), content: '', truncated: false, size: 0 } }
+  async updateNpm() {
+    try { return await window.envAPI.updateNpm() }
+    catch (e) { return { ok: false, error: String(e), output: '' } }
   },
-  async logsDeleteFile(stamp) {
-    try { return await window.logsAPI.deleteFile(stamp) }
-    catch (e) { return { ok: false, error: String(e) } }
+  async updateDsh() {
+    try { return await window.envAPI.updateDsh() }
+    catch (e) { return { ok: false, error: String(e), output: '' } }
+  },
+  async checkPlugin() {
+    try { return await window.envAPI.checkPlugin() }
+    catch (e) { return { installed: false, version: '', error: String(e) } }
+  },
+  async updatePlugin() {
+    try { return await window.envAPI.updatePlugin() }
+    catch (e) { return { ok: false, error: String(e), output: '', beforeVer: '', afterVer: '' } }
+  },
+
+  // 设置向导
+  async setupMarkDone() {
+    try { return await window.setupAPI.markDone() }
+    catch (e) { return false }
   },
 }
 
 // ───────────────────────────────────────────────────────────
-// 5. DOM 引用 + 状态集中管理
+// 5. DOM 引用 + 状态
 // ───────────────────────────────────────────────────────────
 
 const DOM = {
@@ -808,42 +1017,264 @@ const DOM = {
     input: document.getElementById('autostartInput'),
     desc:  document.getElementById('autostartDesc'),
   },
-  logs: {
-    dirPath: document.getElementById('logDirPath'),
-    listBody: document.getElementById('logFileListBody'),
-    openFolderBtn: document.getElementById('logOpenFolderBtn'),
-    openSelectedBtn: document.getElementById('logOpenSelectedBtn'),
-    deleteSelectedBtn: document.getElementById('logDeleteSelectedBtn'),
-    refreshBtn: document.getElementById('logRefreshBtn'),
+  env: {
+    nodeStatus:    document.getElementById('nodeStatus'),
+    nodeVersion:   document.getElementById('nodeVersion'),
+    nodeRefresh:   document.getElementById('nodeRefreshBtn'),
+    npmStatus:     document.getElementById('npmStatus'),
+    npmVersion:    document.getElementById('npmVersion'),
+    npmUpdate:     document.getElementById('npmUpdateBtn'),
+    dshStatus:     document.getElementById('dshStatus'),
+    dshVersion:    document.getElementById('dshVersion'),
+    dshUpdate:     document.getElementById('dshUpdateBtn'),
+    dshPluginBtn:  document.getElementById('dshPluginBtn'),
+    dshPluginStatus: document.getElementById('dshPluginStatus'),
+    dshPluginVersion: document.getElementById('dshPluginVersion'),
+    checkAll:      document.getElementById('checkAllBtn'),
+    updateLog:     document.getElementById('updateLog'),
   },
+  setupBanner: document.getElementById('setupBanner'),
 }
 
 const state = {
-  // 录制器
   recorder: {
-    shortcut: DEFAULT_SHORTCUT, // 当前已提交的 accelerator
-    draft: '',                  // 正在录制但未提交的值
-    recording: false,           // 是否处于录制态
+    shortcut: DEFAULT_SHORTCUT,
+    draft: '',
+    recording: false,
   },
-  // 开机自启
   autostart: {
-    enabled: false,       // 用户偏好值
-    available: false,     // 是否可用（仅打包 exe 时 true）
-    actuallySet: false,   // 系统实际注册状态
-    busy: false,          // IPC 进行中，防重复点击
+    enabled: false,
+    available: false,
+    actuallySet: false,
+    busy: false,
   },
-  // 日志
-  logs: {
-    dir: '',
-    todayStamp: '',
-    files: [],            // [{stamp, exists, size, mtime, path, name}]
-    selectedStamp: null,  // 当前选中的日期
-    busy: false,          // 加载中防重复
+  env: {
+    node: { ok: false, version: '', checking: false },
+    npm:  { ok: false, version: '', checking: false },
+    dsh:  { ok: false, version: '', checking: false },
+    plugin: { installed: false, version: '', checking: false },
+    globalChecking: false,
   },
 }
 
 // ───────────────────────────────────────────────────────────
-// 6. 录制器状态机（render / start / stop / cancel / clear / commit）
+// 6. 环境检查模块
+// ───────────────────────────────────────────────────────────
+
+const Env = {
+  renderOne(key) {
+    const info = state.env[key]
+    const dom = this.domFor(key)
+    if (!dom) return
+
+    const verEl = dom.versionEl
+    const statusEl = dom.statusEl
+    const updateBtn = dom.updateBtn
+    const refreshBtn = dom.refreshBtn
+
+    if (info.checking) {
+      verEl.textContent = '...'
+      verEl.classList.add('loading')
+      statusEl.innerHTML = '<span class="status-dot loading"></span> 检测中...'
+      if (updateBtn) updateBtn.disabled = true
+      if (refreshBtn) refreshBtn.disabled = true
+      return
+    }
+
+    verEl.classList.remove('loading')
+    if (key === 'plugin') {
+      if (info.installed) {
+        verEl.textContent = info.version
+        statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
+        if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = '更新插件市场' }
+      } else {
+        verEl.textContent = '未安装'
+        statusEl.innerHTML = '<span class="status-dot err"></span> 未检测到'
+        if (updateBtn) { updateBtn.disabled = false; updateBtn.textContent = '安装插件市场' }
+      }
+    } else if (info.ok) {
+      verEl.textContent = info.version
+      statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
+      if (updateBtn) updateBtn.disabled = false
+    } else {
+      verEl.textContent = '未安装'
+      statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.version || '未检测到')
+      if (updateBtn && key === 'dsh') updateBtn.disabled = false
+      else if (updateBtn) updateBtn.disabled = true
+    }
+    if (refreshBtn) refreshBtn.disabled = false
+  },
+
+  domFor(key) {
+    if (key === 'node') return {
+      versionEl: DOM.env.nodeVersion, statusEl: DOM.env.nodeStatus,
+      updateBtn: null, refreshBtn: DOM.env.nodeRefresh,
+    }
+    if (key === 'npm') return {
+      versionEl: DOM.env.npmVersion, statusEl: DOM.env.npmStatus,
+      updateBtn: DOM.env.npmUpdate, refreshBtn: null,
+    }
+    if (key === 'dsh') return {
+      versionEl: DOM.env.dshVersion, statusEl: DOM.env.dshStatus,
+      updateBtn: DOM.env.dshUpdate, refreshBtn: null,
+    }
+    if (key === 'plugin') return {
+      versionEl: DOM.env.dshPluginVersion, statusEl: DOM.env.dshPluginStatus,
+      updateBtn: DOM.env.dshPluginBtn, refreshBtn: null,
+    }
+    return null
+  },
+
+  async checkOne(key) {
+    state.env[key].checking = true
+    this.renderOne(key)
+
+    let result
+    if (key === 'node') result = await IPC.checkNode()
+    else if (key === 'npm') result = await IPC.checkNpm()
+    else if (key === 'dsh') result = await IPC.checkDsh()
+    else if (key === 'plugin') result = await IPC.checkPlugin()
+
+    state.env[key].checking = false
+    if (key === 'plugin') {
+      state.env[key].installed = result.installed
+      state.env[key].version = result.version || ''
+    } else {
+      state.env[key].ok = result.ok
+      state.env[key].version = result.version || ''
+    }
+    this.renderOne(key)
+    this.updateAllState()
+    return result
+  },
+
+  async checkAll() {
+    state.env.globalChecking = true
+    this.updateAllState()
+    await Promise.all([
+      this.checkOne('node'),
+      this.checkOne('npm'),
+      this.checkOne('dsh'),
+      this.checkOne('plugin'),
+    ])
+    state.env.globalChecking = false
+    this.updateAllState()
+  },
+
+  updateAllState() {
+    const allOk = state.env.node.ok && state.env.npm.ok && state.env.dsh.ok
+    DOM.env.checkAll.disabled = state.env.globalChecking
+    DOM.env.checkAll.textContent = state.env.globalChecking ? '检测中...' : '重新检测全部'
+
+    // 全部通过后隐藏 Banner
+    if (allOk && DOM.setupBanner) {
+      DOM.setupBanner.style.display = 'none'
+      IPC.setupMarkDone()
+    }
+  },
+
+  async updateNpm() {
+    DOM.env.npmUpdate.disabled = true
+    DOM.env.npmUpdate.textContent = '更新中...'
+    const beforeVer = state.env.npm.version
+    this.showLog('正在更新 npm 到最新版...\n', '')
+    const res = await IPC.updateNpm()
+    this.showLog(res.output + '\n', res.ok ? '' : 'error')
+    if (res.ok) {
+      await this.checkOne('npm')
+      const afterVer = state.env.npm.version
+      if (beforeVer && afterVer && beforeVer !== afterVer) {
+        this.showLog('npm ' + beforeVer + ' → ' + afterVer + '  更新成功！', 'ok')
+        Toast.success('npm 已更新到 ' + afterVer)
+      } else {
+        this.showLog('npm 已是最新版本 (' + afterVer + ')，无需更新', '')
+        Toast.info('npm 已是最新版本')
+      }
+    } else {
+      Toast.error('npm 更新失败')
+    }
+    DOM.env.npmUpdate.disabled = false
+    DOM.env.npmUpdate.textContent = '更新'
+  },
+
+  async updateDsh() {
+    DOM.env.dshUpdate.disabled = true
+    DOM.env.dshUpdate.textContent = '更新中...'
+    const beforeVer = state.env.dsh.version
+    this.showLog('正在更新 dsh 到最新版...\n', '')
+    const res = await IPC.updateDsh()
+    this.showLog(res.output + '\n', res.ok ? '' : 'error')
+    if (res.ok) {
+      await this.checkOne('dsh')
+      const afterVer = state.env.dsh.version
+      if (beforeVer && afterVer && beforeVer !== afterVer) {
+        this.showLog('dsh ' + beforeVer + ' → ' + afterVer + '  更新成功！', 'ok')
+        Toast.success('dsh 已更新到 ' + afterVer)
+      } else {
+        this.showLog('dsh 已是最新版本 (' + afterVer + ')，无需更新', '')
+        Toast.info('dsh 已是最新版本')
+      }
+    } else {
+      Toast.error('dsh 更新失败')
+    }
+    DOM.env.dshUpdate.disabled = false
+    DOM.env.dshUpdate.textContent = '更新'
+  },
+
+  async updatePlugin() {
+    DOM.env.dshPluginBtn.disabled = true
+    DOM.env.dshPluginBtn.textContent = '检测中...'
+    this.showLog('正在检测 dshmarket 插件...\n', '')
+
+    // 先检查当前版本
+    const checkRes = await IPC.checkPlugin()
+    const beforeVer = checkRes.installed ? checkRes.version : '(未安装)'
+    state.env.plugin.installed = checkRes.installed
+    state.env.plugin.version = checkRes.version || ''
+
+    if (checkRes.installed) {
+      this.showLog('dshmarket 当前版本：' + beforeVer + '，正在更新到最新版...\n', '')
+      DOM.env.dshPluginBtn.textContent = '更新中...'
+    } else {
+      this.showLog('dshmarket 未安装，正在安装...\n', '')
+      DOM.env.dshPluginBtn.textContent = '安装中...'
+    }
+
+    const res = await IPC.updatePlugin()
+    this.showLog(res.output + '\n', res.ok ? '' : 'error')
+    if (res.ok) {
+      // 重新检测安装后的版本
+      const afterCheck = await IPC.checkPlugin()
+      state.env.plugin.installed = afterCheck.installed
+      state.env.plugin.version = afterCheck.version || ''
+      const afterVer = afterCheck.installed ? afterCheck.version : '?'
+      if (beforeVer !== afterVer) {
+        this.showLog('dshmarket ' + beforeVer + ' → ' + afterVer + '  成功！', 'ok')
+        Toast.success('dshmarket 已更新到 ' + afterVer)
+      } else {
+        this.showLog('dshmarket 已是最新版本（' + afterVer + '）', 'ok')
+        Toast.info('dshmarket 已是最新版本')
+      }
+      this.renderOne('plugin')
+    } else {
+      Toast.error('dshmarket 安装/更新失败')
+      DOM.env.dshPluginStatus.innerHTML =
+        '<span class="status-dot err"></span> 操作失败，请重试'
+    }
+    DOM.env.dshPluginBtn.disabled = false
+    DOM.env.dshPluginBtn.textContent = state.env.plugin.installed ? '更新插件市场' : '安装插件市场'
+  },
+
+  showLog(text, cls) {
+    const el = DOM.env.updateLog
+    el.textContent += text
+    el.className = 'update-log show' + (cls ? ' ' + cls : '')
+    el.scrollTop = el.scrollHeight
+  },
+}
+
+// ───────────────────────────────────────────────────────────
+// 7. 录制器状态机
 // ───────────────────────────────────────────────────────────
 
 const Recorder = {
@@ -869,7 +1300,6 @@ const Recorder = {
 
   stop() {
     state.recorder.recording = false
-    // 以 draft 为准提交（若 draft 空则保持原值）
     if (state.recorder.draft) this.commit(state.recorder.draft)
     else this.render()
   },
@@ -893,7 +1323,6 @@ const Recorder = {
 
     const ok = await IPC.setShortcut('toggleWindow', newValue)
     if (!ok) {
-      // 失败回滚
       state.recorder.shortcut = prev
       state.recorder.draft = prev
       this.render()
@@ -905,14 +1334,10 @@ const Recorder = {
 }
 
 // ───────────────────────────────────────────────────────────
-// 6a. 开机自启状态机（render / load / commit）
+// 8. 开机自启模块
 // ───────────────────────────────────────────────────────────
 
 const AutoStart = {
-  /**
-   * 同步渲染：checkbox 状态、disabled 状态、描述文案
-   * 以 state.autostart 为单一真源，防止 DOM 与状态脱节
-   */
   render() {
     const { enabled, available, busy } = state.autostart
     const el = DOM.autostart.input
@@ -943,7 +1368,7 @@ const AutoStart = {
     if (state.autostart.busy) return
     if (!state.autostart.available) {
       Toast.info('打包为 .exe 后可使用此功能')
-      this.render() // 强制把 checkbox 打回原值
+      this.render()
       return
     }
 
@@ -956,7 +1381,6 @@ const AutoStart = {
     state.autostart.busy = false
 
     if (!res) {
-      // IPC 失败：回滚
       state.autostart.enabled = prev
       this.render()
       return
@@ -971,164 +1395,11 @@ const AutoStart = {
 }
 
 // ───────────────────────────────────────────────────────────
-// 6b. 日志模块（工具、加载、渲染、选中、预览、操作）
-// ───────────────────────────────────────────────────────────
-
-function formatBytes(bytes) {
-  if (!bytes || bytes <= 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let i = 0
-  let n = bytes
-  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
-  return (n >= 100 ? n.toFixed(0) : n >= 10 ? n.toFixed(1) : n.toFixed(2)) + ' ' + units[i]
-}
-
-function formatDateTime(iso) {
-  if (!iso) return '-'
-  try {
-    const d = new Date(iso)
-    const p = (n) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-  } catch { return '-' }
-}
-
-const Logs = {
-  /** 根据 state 渲染文件列表、按钮禁用态 */
-  renderList() {
-    const { files, selectedStamp, todayStamp } = state.logs
-    const body = DOM.logs.listBody
-    body.innerHTML = ''
-
-    if (!files.length) {
-      body.innerHTML = '<div class="log-file-row missing" style="justify-content:center;">无日志文件</div>'
-      this.updateActions()
-      return
-    }
-
-    for (const f of files) {
-      const row = document.createElement('div')
-      row.className = 'log-file-row' + (f.exists ? '' : ' missing') + (selectedStamp === f.stamp ? ' active' : '')
-      row.dataset.stamp = f.stamp
-
-      const name = document.createElement('div')
-      name.className = 'log-file-name'
-      name.textContent = f.name
-      name.title = f.path || f.name
-      row.appendChild(name)
-
-      const size = document.createElement('div')
-      size.className = 'log-file-size'
-      size.textContent = f.exists ? formatBytes(f.size) : '-'
-      row.appendChild(size)
-
-      const time = document.createElement('div')
-      time.className = 'log-file-time'
-      time.textContent = f.exists ? formatDateTime(f.mtime) : '-'
-      row.appendChild(time)
-
-      const status = document.createElement('div')
-      status.className = 'log-file-status'
-      if (f.stamp === todayStamp) {
-        status.innerHTML = '<span class="tag-today">今天</span>'
-      } else if (!f.exists) {
-        status.textContent = '—'
-      } else {
-        status.textContent = '✓'
-      }
-      row.appendChild(status)
-
-      if (f.exists) {
-        row.addEventListener('click', () => this.select(f.stamp))
-      }
-      body.appendChild(row)
-    }
-
-    this.updateActions()
-  },
-
-  updateActions() {
-    const { selectedStamp, files } = state.logs
-    const selected = files.find((f) => f.stamp === selectedStamp && f.exists)
-    const hasSelected = Boolean(selected)
-    DOM.logs.openSelectedBtn.disabled = !hasSelected
-    DOM.logs.deleteSelectedBtn.disabled = !hasSelected
-  },
-
-  select(stamp) {
-    state.logs.selectedStamp = stamp
-    this.renderList()
-  },
-
-  async loadInfo({ reload = false } = {}) {
-    if (state.logs.busy) return
-    state.logs.busy = true
-    try {
-      const info = await IPC.logsGetInfo()
-      if (!info) {
-        Toast.error(reload ? '刷新失败' : '日志加载失败')
-        return
-      }
-      state.logs.dir = info.dir || ''
-      state.logs.todayStamp = info.todayStamp || ''
-      state.logs.files = info.files || []
-      DOM.logs.dirPath.textContent = state.logs.dir || '-'
-      DOM.logs.dirPath.title = state.logs.dir || ''
-
-      // 首次加载自动选中今天（若存在），否则保持选中状态
-      if (!reload || !state.logs.selectedStamp) {
-        const today = state.logs.files.find((f) => f.stamp === state.logs.todayStamp && f.exists)
-        if (today) state.logs.selectedStamp = today.stamp
-        else {
-          const first = state.logs.files.find((f) => f.exists)
-          state.logs.selectedStamp = first ? first.stamp : null
-        }
-      } else {
-        // 若选中的已不存在，重置
-        const still = state.logs.files.find((f) => f.stamp === state.logs.selectedStamp && f.exists)
-        if (!still) state.logs.selectedStamp = null
-      }
-
-      this.renderList()
-      if (reload) Toast.success('已刷新')
-    } finally {
-      state.logs.busy = false
-    }
-  },
-
-  async openFolder() {
-    await IPC.logsOpenFolder()
-  },
-
-  async openSelected() {
-    const stamp = state.logs.selectedStamp
-    if (!stamp) return
-    const res = await IPC.logsOpenFile(stamp)
-    if (!res?.ok) Toast.error('打开失败：' + (res?.error || '未知错误'))
-  },
-
-  async deleteSelected() {
-    const stamp = state.logs.selectedStamp
-    if (!stamp) return
-    const file = state.logs.files.find((f) => f.stamp === stamp)
-    if (!file?.exists) return
-    const confirmed = window.confirm(`确认删除日志文件「${file.name}」吗？此操作不可恢复。`)
-    if (!confirmed) return
-    const res = await IPC.logsDeleteFile(stamp)
-    if (res?.ok) {
-      Toast.success('已删除')
-      state.logs.selectedStamp = null
-      await this.loadInfo({ reload: true })
-    } else {
-      Toast.error('删除失败：' + (res?.error || '未知错误'))
-    }
-  },
-}
-
-
+// 9. 事件绑定
 // ───────────────────────────────────────────────────────────
 
 function bindEvents() {
-  const { input, resetBtn, autostart, logs } = DOM
+  const { input, resetBtn, autostart } = DOM
 
   // ── 标签页切换 ──
   const tabNav = document.getElementById('tabNav')
@@ -1138,16 +1409,15 @@ function bindEvents() {
   tabBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       const targetTab = btn.dataset.tab
-      // 切换按钮激活态
       tabBtns.forEach((b) => b.classList.remove('active'))
       btn.classList.add('active')
-      // 切换面板显示
       tabPanels.forEach((p) => p.classList.remove('active'))
       const targetPanel = document.getElementById('tab-' + targetTab)
       if (targetPanel) targetPanel.classList.add('active')
     })
   })
 
+  // ── 快捷键录制 ──
   input.addEventListener('focus', () => Recorder.start())
   input.addEventListener('blur', () => {
     if (!state.recorder.recording) return
@@ -1158,9 +1428,8 @@ function bindEvents() {
     AutoStart.commit(Boolean(e.target.checked))
   })
 
-  // 键盘事件：捕获阶段优先处理，防止被其他控件吞
+  // 键盘事件：捕获阶段优先处理
   document.addEventListener('keydown', (e) => {
-    // 场景 A：录制态
     if (state.recorder.recording) {
       e.preventDefault()
       e.stopPropagation()
@@ -1181,13 +1450,11 @@ function bindEvents() {
       if (!accel) return
 
       state.recorder.draft = accel
-      // 自动提交：末段不是"修饰符标准名"，且至少 2 段（或 Fn 单键）
       const parts = accel.split('+')
       const last = parts[parts.length - 1]
       const isModifier = PURE_MODIFIER_KEYS.has(last)
       if (!isModifier && parts.length >= 2) {
         input.blur()
-        // 走 commit 分支（提交前先关闭 recording 标记）
         state.recorder.recording = false
         Recorder.commit(accel)
       } else {
@@ -1196,9 +1463,7 @@ function bindEvents() {
       return
     }
 
-    // 场景 B：非录制态，Esc 关闭设置窗口
     if (e.key === 'Escape') {
-      // 防止 input 聚焦时触发浏览器默认 blur 行为
       IPC.closeWindow()
     }
   }, true)
@@ -1209,23 +1474,25 @@ function bindEvents() {
     Toast.success('已恢复默认快捷键')
   })
 
-  // 日志按钮事件
-  logs.openFolderBtn.addEventListener('click', () => Logs.openFolder())
-  logs.openSelectedBtn.addEventListener('click', () => Logs.openSelected())
-  logs.deleteSelectedBtn.addEventListener('click', () => Logs.deleteSelected())
-  logs.refreshBtn.addEventListener('click', () => Logs.loadInfo({ reload: true }))
+
+  // 环境检查按钮
+  DOM.env.checkAll.addEventListener('click', () => Env.checkAll())
+  DOM.env.nodeRefresh.addEventListener('click', () => Env.checkOne('node'))
+  DOM.env.npmUpdate.addEventListener('click', () => Env.updateNpm())
+  DOM.env.dshUpdate.addEventListener('click', () => Env.updateDsh())
+  DOM.env.dshPluginBtn.addEventListener('click', () => Env.updatePlugin())
 }
 
 // ───────────────────────────────────────────────────────────
-// 8. 启动初始化（并发拉取设置 + 平台 + 版本）
+// 10. 启动初始化
 // ───────────────────────────────────────────────────────────
 
 async function init() {
   const [settings] = await Promise.all([
     IPC.getSettings(),
     IPC.fillAboutInfo(),
-    AutoStart.load(), // 与其他设置并行拉取
-    Logs.loadInfo(),  // 日志列表与目录并行加载
+    AutoStart.load(),
+    Env.checkAll(),  // 启动时自动检测环境
   ])
 
   const saved = settings?.shortcuts?.toggleWindow

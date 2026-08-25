@@ -1,23 +1,35 @@
 // ═══════════════════════════════════════════════════════════════
 // 配置存储（简单键值 JSON 文件）
-// 便携模式 → exe 旁边的 config.json；标准模式 → %APPDATA%/DeepSeekHarness/config.json
+// 开发模式：项目根目录/config.json
+// 安装模式：$DSH_HOME/storages/deepseek-harness-desktop/config.json
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('node:fs')
-const { join } = require('node:path')
-const { DEFAULT_SHORTCUT, appRootDir } = require('./constants')
+const { dirname, join } = require('node:path')
+const { DEFAULT_SHORTCUT, configFilePath, appRootDir } = require('./constants')
 const { logEvent } = require('./state')
 
 function createJsonStore(defaults) {
-  const filePath = join(appRootDir(), 'config.json')
+  const filePath = configFilePath()
   let data = { ...defaults }
 
   try {
     data = { ...defaults, ...JSON.parse(fs.readFileSync(filePath, 'utf-8')) }
-  } catch { /* 文件不存在或损坏 → 使用 defaults */ }
+  } catch {
+    // 打包模式下新路径无配置 → 尝试从旧路径（exe 旁边）迁移
+    const oldPath = join(appRootDir(), 'config.json')
+    if (oldPath !== filePath) {
+      try {
+        const oldData = JSON.parse(fs.readFileSync(oldPath, 'utf-8'))
+        data = { ...defaults, ...oldData }
+        logEvent('store.migrate', { from: oldPath, to: filePath })
+      } catch { /* 旧路径也无文件 → 使用 defaults */ }
+    }
+  }
 
   function save() {
     try {
+      fs.mkdirSync(dirname(filePath), { recursive: true })
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
     } catch (err) {
       logEvent('store.save.fail', { err }, 'error')

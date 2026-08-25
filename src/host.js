@@ -76,7 +76,7 @@ function createReadinessParser() {
   }
 }
 
-function appendStdoutTail(chunk) {
+function appendHostTail(chunk) {
   state.hostStdoutTail = `${state.hostStdoutTail}${chunk}`.slice(-HOST_STDOUT_TAIL_LIMIT)
 }
 
@@ -109,7 +109,7 @@ function waitForHostReady(child) {
     }
 
     child.stdout.on('data', (chunk) => {
-      appendStdoutTail(chunk)
+      appendHostTail(chunk)
       logWriter.write(chunk, 'stdout')
       try {
         const url = parser.push(chunk.toString())
@@ -125,7 +125,7 @@ function waitForHostReady(child) {
       }
     })
     child.stderr.on('data', (chunk) => {
-      appendStdoutTail(chunk)
+      appendHostTail(chunk)
       logWriter.write(chunk, 'stderr')
     })
     child.on('error', (e) => fail(`Host 启动失败：${e.message}`))
