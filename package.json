@@ -71,8 +71,7 @@
           ]
         }
       ],
-      "icon": "assets/favicon.svg",
-      "desktopName": "DeepSeek Harness Desktop Simple",
+      "icon": "assets/favicon.png",
       "syncDesktopName": true,
       "category": "Utility",
       "maintainer": "Hyrinx",
