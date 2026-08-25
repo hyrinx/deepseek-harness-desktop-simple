@@ -8,8 +8,7 @@
     "build": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
     "build:win": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
     "build:linux": "set NODE_OPTIONS=--use-system-ca && electron-builder --linux",
-    "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac",
-    "generate:icns": "node scripts/generate-icns.js"
+    "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac"
   },
   "build": {
     "appId": "com.hyrinx.deepseek-harness-desktop-simple",
@@ -84,17 +83,11 @@
       "target": [
         {
           "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["x64", "arm64"]
         },
         {
           "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["x64", "arm64"]
         }
       ],
       "icon": "assets/app.icns",
