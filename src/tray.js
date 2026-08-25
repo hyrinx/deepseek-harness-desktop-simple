@@ -9,7 +9,7 @@ const { join } = require('node:path')
 const { nativeImage, ipcMain, screen } = require('electron')
 const { menubar } = require('electron-menubar')
 const { state, logEvent } = require('./state')
-const { APP_NAME, ICON_PATH, IS_WIN } = require('./constants')
+const { APP_NAME, ICON_PATH, IS_WIN, IS_LINUX } = require('./constants')
 
 // ── 托盘菜单：常量 + 内联 HTML ──
 
@@ -101,11 +101,20 @@ function trayImage() {
 /**
  * electron-menubar 封装：自建 Tray，重绑左右键语义。
  *
- * 位置修正：electron-menubar 在 Windows 下每次 showWindow 都会调用
- * applyWindowPosition → getWindowPosition() 覆盖 windowPosition 为
- * 'bottomRight'（屏幕右下角）。我们通过 monkey-patch 跳过原始逻辑，
- * 直接用鼠标位置定位：菜单左边缘在鼠标右侧，底边缘在鼠标上方，
- * 即菜单出现在鼠标的右上角。
+ * 位置修正（Windows / Linux）：electron-menubar 在 Windows 下每次
+ * showWindow 都会调用 applyWindowPosition → getWindowPosition() 覆盖
+ * windowPosition 为 'bottomRight'（屏幕右下角）。我们通过 monkey-patch
+ * 跳过原始逻辑，直接用鼠标位置 + setBounds 定位：默认菜单左边缘在鼠标
+ * 右侧、底边缘在鼠标上方（鼠标右上角）；若鼠标上方空间不足（如 Linux
+ * 顶部面板托盘）则自动向下展开，并在左右溢出时向内收缩，保证菜单不越界。
+ *
+ * macOS 上不需要 monkey-patch：electron-menubar 的 trayCenter 在菜单栏
+ * 图标下方原生定位已正确。
+ *
+ * 垂直偏移修复：menubar 内部在 showWindow 时可能重置窗口尺寸为
+ * browserWindow 配置的初始值（200x200），导致 getBounds().height
+ * 返回错误值 → 定位偏移。改用 did-finish-load 后缓存的 menuSize，
+ * 通过 setBounds 一次性设置位置+尺寸，彻底消除偏移。
  */
 function createTrayAndMenu(callbacks) {
   logEvent('tray.create.start')
@@ -149,19 +158,53 @@ function createTrayAndMenu(callbacks) {
     catch (err) { logEvent('menubar.topmost.fail', { err }, 'warn') }
     logEvent('menubar.window.created', { id: mb.window?.id })
 
-    // monkey-patch: electron-menubar 在 Windows 下每次 showWindow 都会调用
-    // applyWindowPosition → getWindowPosition() 覆盖 windowPosition 为
-    // 'bottomRight'（屏幕右下角）。这里直接跳过原始逻辑，用鼠标位置定位：
-    // 菜单左边缘在鼠标右侧，底边缘在鼠标上方，即菜单在鼠标右上角。
-    mb.applyWindowPosition = () => {
-      const mp = state.trayMenu?._mousePos
-      if (mp && mb.window && !mb.window.isDestroyed()) {
-        try {
-          const menuX = Math.round(mp.x)
-          const menuY = Math.round(mp.y - MENU_HEIGHT)
-          mb.window.setPosition(menuX, menuY)
-        } catch (err) {
-          logEvent('menubar.reposition.fail', { err }, 'warn')
+    // 初始取已知真实尺寸，避免 did-finish-load 异步测量前使用假尺寸（200x200）
+    let menuSize = { width: MENU_WIDTH, height: MENU_HEIGHT }
+
+    // 内容加载后测量实际尺寸，自适应窗口宽高
+    mb.window.webContents.on('did-finish-load', () => {
+      try {
+        mb.window.webContents.executeJavaScript(`
+          (function() {
+            var body = document.body
+            var html = document.documentElement
+            var w = Math.max(body.scrollWidth, body.offsetWidth, html.clientWidth, 120)
+            var h = Math.max(body.scrollHeight, body.offsetHeight, html.clientHeight)
+            return { width: Math.ceil(w), height: Math.ceil(h) }
+          })()
+        `).then((size) => {
+          if (size && mb.window && !mb.window.isDestroyed()) {
+            menuSize = { width: size.width, height: size.height }
+            mb.window.setSize(size.width, size.height)
+            logEvent('menubar.resize', { width: size.width, height: size.height })
+          }
+        }).catch(() => {})
+      } catch (err) { logEvent('menubar.resize.fail', { err }, 'warn') }
+    })
+
+    // Windows / Linux：monkey-patch 用 setBounds 一次性设置位置+尺寸。
+    // 默认定位鼠标右上角；上方空间不足时向下展开，左右越界时向内收缩，
+    // 保证菜单始终落在当前屏幕工作区内。macOS 不覆盖，用 menubar 默认定位。
+    if (IS_WIN || IS_LINUX) {
+      mb.applyWindowPosition = () => {
+        const mp = state.trayMenu?._mousePos
+        if (mp && mb.window && !mb.window.isDestroyed()) {
+          try {
+            const ca = screen.getDisplayNearestPoint(mp).workArea
+            const fitAbove = (mp.y - menuSize.height) >= ca.y
+            const menuY = fitAbove ? Math.round(mp.y - menuSize.height) : Math.round(mp.y)
+            let menuX = Math.round(mp.x)
+            const maxX = ca.x + ca.width - menuSize.width
+            if (menuX > maxX) menuX = Math.max(ca.x, Math.round(mp.x - menuSize.width))
+            mb.window.setBounds({
+              x: menuX,
+              y: menuY,
+              width: menuSize.width,
+              height: menuSize.height,
+            })
+          } catch (err) {
+            logEvent('menubar.reposition.fail', { err }, 'warn')
+          }
         }
       }
     }

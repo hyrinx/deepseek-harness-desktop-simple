@@ -6,7 +6,7 @@
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" />
     <img src="https://img.shields.io/badge/Electron-43-47848F.svg" alt="Electron 43" />
     <img src="https://img.shields.io/badge/Node-%3E%3D18-339933.svg" alt="Node >= 18" />
-    <img src="https://img.shields.io/badge/platform-Windows-lightgrey.svg" alt="Platform: Windows" />
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg" alt="Platform: Windows | Linux | macOS" />
     <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome" />
   </p>
 </div>
@@ -33,11 +33,13 @@ DeepSeek Harness Desktop Simple是一个基于 Electron 的轻量桌面壳，采
 - 🚀 调用系统 `dsh web` 启动本地 Web 服务，BrowserWindow 嵌入展示；
   启动失败（dsh 未安装）则弹窗提示并退出
 - 🪟 Windows 下 Acrylic 亚克力背景 + 透明 `titleBarOverlay`；
-  macOS 下 `hiddenInset` 红绿灯 + sidebar 毛玻璃效果
+  macOS 下 `hiddenInset` 红绿灯 + sidebar 毛玻璃效果；
+  Linux 下原生窗口边框 + `titleBarOverlay` 按钮覆盖层
 - 🎨 悬浮标题栏拖拽：纯 DOM 事件 → `setBounds` 显式钉住宽高，
   规避 Electron `setPosition` 篡改尺寸的核心 bug，4px 阈值防误触，交互控件零遮挡
-- 📋 类原生托盘：自绘无边框透明圆角菜单 + 悬浮高亮 + 智能定位
-  （菜单在鼠标右上角弹出）；左键单击显隐主窗口，右键打开菜单
+- 📋 类原生托盘菜单：Windows/Linux 菜单定位鼠标右上角，macOS 定位菜单栏图标正下方；
+  样式精确匹配 Win32 原生右键菜单（Segoe UI 12px / 24px 行高 / 系统高亮色）；
+  左键单击显隐主窗口，右键打开菜单
 - ⌨️ 全局快捷键显示/隐藏主窗口，默认 `Ctrl+Shift+Space`，设置页支持实时录制
 - 🔋 开机自启（打包后生效），静默启动时只出托盘不弹窗口
 - ⚙️ 设置页纯原生实现提供：
@@ -45,8 +47,8 @@ DeepSeek Harness Desktop Simple是一个基于 Electron 的轻量桌面壳，采
   - **常规** — 快捷键录制器 + 开机自启 Switch + 乐观更新 + Toast 提示
 - 🔒 安全加固：`contextIsolation` + `sandbox` + 权限拒绝 + 导航限制 +
   外部链接用浏览器打开 + 弹窗 deny
-- 🧹 退出时进程树终止（Windows 下 `taskkill /t`），单实例锁防多开，
-  第二实例自动唤起主窗口；关闭主窗口时隐藏到托盘而非退出
+- 🧹 退出时进程树终止（Windows `taskkill /t`，Linux/macOS `SIGTERM` 进程组），
+  单实例锁防多开，第二实例自动唤起主窗口；关闭主窗口时隐藏到托盘而非退出
 - 🔄 托盘菜单支持应用重启，重启前清理 UI 和子进程
 
 ## 预览
@@ -161,10 +163,53 @@ DeepSeek Harness/
 
 - **需要预装环境** — 需系统已安装 Node.js（>= 18）与 dsh CLI，不提供「下载即用」的捆绑运行时；
 - **自更新为手动** — 不内置自动更新，需在设置页「环境」标签手动更新 dsh；
-- **平台支持** — 构建配置目前仅 Windows（NSIS + Portable）；代码含 macOS 适配分支
-  （hiddenInset / 毛玻璃），但尚未配置 macOS 打包，暂无 Linux 版本；
+- **平台支持** — v1.2.0 起已配置 Windows（NSIS + Portable）/ Linux（AppImage + deb + rpm）/
+  macOS（dmg + zip）跨平台构建与 CI，但 Linux / macOS 仅完成「构建层面」的支持，
+  **未经真机充分验证**，运行期表现详见下方[多平台测试](#多平台测试)清单；
 - **运行时依赖** — 存在 1 个第三方运行时依赖（`electron-menubar`，托盘封装）；
 - **上游兼容** — 跟随系统 `dsh` 版本，上游破坏性变更可能影响桌面壳（与 Tauri 版一致）。
+
+## 多平台测试
+
+> **关于 macOS 的补充说明**：本项目的持续集成环境不包含 Apple 签名证书，发布产物为
+> **未签名**应用。首次打开需右键 →「打开」绕过 Gatekeeper 拦截，或由维护者自行配置
+> `CSC_LINK` / `CSC_KEY_PASSWORD` 后重新构建签名版本。
+
+### Linux（尚未真机验证）
+
+> 构建已通过 AppImage / deb / rpm，以下运行期行为**必须**在真机（建议 GNOME / KDE，
+> 分别覆盖 X11 与 Wayland 会话）上验证：
+
+- [ ] **托盘图标与菜单** — 托盘图标能否正常显示（当前使用 `.ico`，需确认 Linux 下
+      `nativeImage` 能正确解码）；左键显隐窗口、右键打开菜单的定位方向是否正确；
+      靠近屏幕边缘时菜单是否会溢出到屏幕外
+- [ ] **窗口边框与背景** — Linux 下 `frame` + `titleBarStyle` + `transparent`
+      组合实际渲染效果；Wayland 会话下透明背景是否失效、原生标题栏是否遮挡内容
+- [ ] **开机自启** — `app.setLoginItemSettings` 在 Linux 下是否生效/兜底，设置页
+      开关是否有异常；`.desktop autostart` 是否随桌面环境正常工作
+- [ ] **进程树清理** — 退出/重启后确认 `dsh` 子进程及其派生进程被整组终止
+      （`process.kill(-pid)` 依赖 `detached` 生效），无残留孤儿进程
+- [ ] **全局快捷键 / 单实例锁 / 关闭隐藏到托盘** — 与 Windows 一致的核心交互是否正常
+
+### macOS（尚未真机验证）
+
+> 构建已通过 dmg / zip（x64 + arm64），以下运行期行为**必须**在真机上验证：
+
+- [ ] **托盘图标** — macOS 下 `nativeImage.createFromPath` 读取 `.ico`（`favicon.ico`）
+      是否返回空图标（NSImage 对 ICO 支持有限）。若为空则需改用 `.png`/`.icns`
+- [ ] **托盘菜单定位** — macOS 不 monkey-patch `applyWindowPosition`，验证菜单是否
+      正常定位在菜单栏图标正下方，尺寸是否被 `setSize` 正确自适应
+- [ ] **窗口毛玻璃与红绿灯** — `hiddenInset` 红绿灯位置 / `trafficLightPosition` /
+      `vibrancy: sidebar` 毛玻璃/半透明效果是否如实呈现，`setBounds` 拖拽是否正常
+- [ ] **开机自启** — `setLoginItemSettings` 的 LoginItem 是否注册、移除成功
+- [ ] **签名与 Gatekeeper** — 未签名.dmg 安装后右键→打开是否可运行；
+      entitlements 是否满足硬编码运行时（hardenedRuntime）要求
+
+### 跨平台通用（每次发版必测）
+
+- [ ] **`dsh web` 拉起与就绪检测** — Node/npm/dsh 版本检测、「一键更新」与插件安装
+      命令（`windowsHide` 相关差异）在各平台 CLI 输出解析是否一致
+- [ ] **日志行为** — `$DSH_HOME/logs/` 路径与写入在各平台的读线程/权限是否正常
 
 ## 常见问题
 

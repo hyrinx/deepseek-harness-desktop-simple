@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: '版本号（如 v1.2.0）'
+        required: true
+        type: string
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            build_flag: --linux
+            artifact_name: linux
+          - os: macos-latest
+            build_flag: --mac
+            artifact_name: macos
+          - os: windows-latest
+            build_flag: --win
+            artifact_name: windows
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建 (${{ matrix.os }})
+        run: npx electron-builder ${{ matrix.build_flag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: 列出产物
+        run: ls -R dist/
+
+      - name: 发布到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          tag_name: ${{ inputs.tag_name || github.ref_name }}
+          draft: true
+          generate_release_notes: true

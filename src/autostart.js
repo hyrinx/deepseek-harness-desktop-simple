@@ -7,6 +7,21 @@ const { store } = require('./store')
 const { logEvent } = require('./state')
 const { AUTOSTART_ARG } = require('./constants')
 
+// 只读查询当前登录项状态（无任何写副作用），供 UI 刷新展示
+function readAutoStart() {
+  try {
+    const settings = app.getLoginItemSettings()
+    return {
+      enabled: settings.openAtLogin,
+      available: app.isPackaged,
+      actuallySet: settings.openAtLogin,
+    }
+  } catch (err) {
+    logEvent('autostart.read.fail', { err }, 'error')
+    return { enabled: false, available: app.isPackaged, actuallySet: false }
+  }
+}
+
 function applyAutoStart(enabled) {
   try {
     const { realExePath } = require('./env')
@@ -16,17 +31,13 @@ function applyAutoStart(enabled) {
       path: exe || undefined,
       args: [AUTOSTART_ARG],
     })
-    const settings = app.getLoginItemSettings()
+    const result = readAutoStart()
     logEvent('autostart.apply', {
       requested: enabled,
-      effective: settings.openAtLogin,
       isPackaged: app.isPackaged,
+      effective: result.enabled,
     })
-    return {
-      enabled: settings.openAtLogin,
-      available: app.isPackaged,
-      actuallySet: settings.openAtLogin,
-    }
+    return result
   } catch (err) {
     logEvent('autostart.apply.fail', { err }, 'error')
     return {
@@ -44,4 +55,4 @@ function isLaunchedByAutostart() {
   )
 }
 
-module.exports = { applyAutoStart, isLaunchedByAutostart }
+module.exports = { applyAutoStart, readAutoStart, isLaunchedByAutostart }

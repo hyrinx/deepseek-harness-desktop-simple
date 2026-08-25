@@ -7,7 +7,7 @@ const fs = require('node:fs')
 const { logEvent } = require('./state')
 const { store } = require('./store')
 const { logDirPath } = require('./constants')
-const { applyAutoStart } = require('./autostart')
+const { applyAutoStart, readAutoStart } = require('./autostart')
 const { registerEnvHandlers } = require('./env')
 
 // ── 全局快捷键 ──
@@ -57,10 +57,7 @@ function registerIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('settings:get-autostart', () => {
-    const pref = store.get('ui.autoStart', false)
-    return applyAutoStart(pref)
-  })
+  ipcMain.handle('settings:get-autostart', () => readAutoStart())
 
   ipcMain.handle('settings:set-autostart', (_e, enabled) => {
     const want = Boolean(enabled)
@@ -174,12 +171,17 @@ function registerIpcHandlers() {
   })
 
   ipcMain.on('window-drag-move', (event, screenX, screenY) => {
-    if (!dragWin || !dragBase) return
+    if (!dragWin || !dragBase || dragWin.isDestroyed()) return
     const nx = dragBase.baseX + Math.round(screenX - dragBase.x)
     const ny = dragBase.baseY + Math.round(screenY - dragBase.y)
     if (nx === lastSetX && ny === lastSetY) return
     lastSetX = nx; lastSetY = ny
-    dragWin.setBounds({ x: nx, y: ny, width: dragBase.width, height: dragBase.height })
+    try {
+      dragWin.setBounds({ x: nx, y: ny, width: dragBase.width, height: dragBase.height })
+    } catch {
+      // 拖拽期间窗口被销毁 → 丢弃本次拖拽，避免异常冒泡触发 uncaughtException 强退
+      stopDrag()
+    }
   })
 
   ipcMain.on('window-drag-end', () => {

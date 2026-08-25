@@ -5,8 +5,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux"
+    "build": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
+    "build:win": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
+    "build:linux": "set NODE_OPTIONS=--use-system-ca && electron-builder --linux",
+    "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac"
   },
   "build": {
     "appId": "com.hyrinx.deepseek-harness-desktop-simple",
@@ -64,6 +66,28 @@
       "maintainer": "Hyrinx",
       "synopsis": "DeepSeek Harness 轻量桌面包装",
       "description": "基于 Electron 的 DeepSeek Harness 轻量桌面壳，Native-First 架构。"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/app.icns",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "此应用不需要麦克风权限",
+        "NSCameraUsageDescription": "此应用不需要摄像头权限"
+      }
     }
   },
   "author": "Hyrinx",

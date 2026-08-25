@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            build_cmd: build:linux
+            build_flag: --linux
+          - os: macos-latest
+            build_cmd: build:mac
+            build_flag: --mac
+          - os: windows-latest
+            build_cmd: build:win
+            build_flag: --win
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 构建 (${{ matrix.os }})
+        run: npx electron-builder ${{ matrix.build_flag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
