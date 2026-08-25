@@ -35,6 +35,8 @@ jobs:
         run: npm ci
 
       - name: 构建 (${{ matrix.os }})
-        run: npx electron-builder ${{ matrix.build_flag }}
+        # 显式 --publish never:禁止 electron-builder 隐性上传 Release
+        # (否则会用只读的 GITHUB_TOKEN 写 Releases API 触发 403)
+        run: npx electron-builder ${{ matrix.build_flag }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
