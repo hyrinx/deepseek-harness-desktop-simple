@@ -67,7 +67,15 @@ jobs:
       - name: 发布到 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/**/*
+          # 只发布安装包产物,避免把 Electron 内部框架文件(locale.pak/dll/…)也传上去
+          # 参考 upload-artifact 的子目录结构: dist/<平台>/<安装包>
+          files: |
+            dist/*/*.exe
+            dist/*/*.dmg
+            dist/*/*.AppImage
+            dist/*/*.deb
+            dist/*/*.rpm
+            dist/*/*.zip
           tag_name: ${{ inputs.tag_name || github.ref_name }}
           draft: true
           generate_release_notes: true
