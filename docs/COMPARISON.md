@@ -1,88 +1,105 @@
-# 与其他 DSH 桌面壳的对比
+# DSH 桌面壳对比
 
-DSH 生态中已有多个桌面壳项目。下表从**桌面体验**与**工程复杂度**两个角度，
-对比本项目与两个主流开源实现：
+三款将 DeepSeek Harness CLI 包装为桌面应用的社区项目对比。
 
-| 维度       | **本项目（Electron）**                                    | [dsh-desktop](https://github.com/anywhere-labs/dsh-desktop)（anywhere-labs） | [deepseek-harness-desktop](https://github.com/dsh-tauri-desk/deepseek-harness-desktop)（Tauri） |
-| ---------- | --------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| 技术栈     | Electron 43 + 原生 HTML/CSS/JS                                  | Electron 43 + React 18 + Cordis                                             | Tauri 2（Rust）+ React 19                                                                      |
-| 代码规模   | \~3.5k 行（11 JS + 1 HTML）                                     | \~33k 行（monorepo，159 文件）                                              | 73 Rust + 53 前端文件                                                                          |
-| 运行时依赖 | 1 个（electron-menubar）                                        | 大量（React / Vite / Cordis 等）                                            | 26 Cargo + 17 npm                                                                              |
-| 运行时策略 | 复用系统 Node.js +`dsh web` CLI                               | 固定版本 Harness（submodule）                                               | 首次启动下载 Node + Harness 内核                                                               |
-| 环境依赖   | 需预装 Node.js + dsh CLI                                        | 零依赖，下载即用                                                            | 下载即用（首次需联网装配）                                                                     |
-| 窗口体验   | 自定义悬浮标题栏（titleBarOverlay）+ Acrylic，壁纸铺满无黑边    | 自定义窗口框架（titleBarOverlay + Mica）                                    | 无边框窗口，自绘标题栏，与内容割裂，iframe 加载                                                |
-| 全局快捷键 | ✅ 默认`Ctrl+Shift+Space`，可录制                             | ❌ 无                                                                       | ❌ 无                                                                                          |
-| 系统托盘   | ✅ 类原生，介于两者之间：圆角、悬浮高亮、智能定位，交互贴近原生 | ⚠️ Electron 原生菜单，样式与系统原生不一致，观感一般                      | ✅ Rust 原生 Tray+Menu 符合系统原生，观感最佳；但菜单仅 2 项                                   |
-| 插件生态   | 可选安装dshmark插件市场，实现便捷安装插件体验                   | 一切皆插件 + 内置社区市场                                                   | 插件管理面板 + 预设引导                                                                        |
-| 自更新     | ❌ 手动更新                                                     | ✅ 自定义自更新                                                             | ✅ 自定义自更新                                                                                |
-| 跨平台     | Windows（代码含 macOS 分支）                                    | Windows / macOS                                                             | Windows / macOS / Linux                                                                        |
-| 修改成本   | 低（零框架、代码量小）                                          | 高（monorepo + Cordis）                                                     | 中（Rust + React）                                                                             |
+测试环境全局已安装nodejs、dsh，以及部分插件，已知采用wallpaper-engine插件。
 
-> 注：以上对比基于对三个项目**源码的完整阅读**（本地克隆逐文件核实）及实际使用体验。两个参考项目均为优秀的社区项目，各自侧重不同：dsh-desktop 主打「一切皆插件」的生态与开箱即用，Tauri 版主打「多平台、自更新、档案隔离」。
+---
 
-## 参考项目
+## 截图对比
 
-> 注：以下测试环境均在全局 dsh 下进行，预先已安装常用插件，壁纸采用 wallpaper-engine 插件。
+|                           本项目                           |                   anywhere-labs                   |                        Tauri 版                        |
+| :---------------------------------------------------------: | :-----------------------------------------------: | :----------------------------------------------------: |
+| ![DeepSeek Harness Desktop Simple](../image/README/own.png) | ![dsh-desktop](../image/README/anywhere-labs.png) | ![deepseek-harness-desktop](../image/README/tauri.png) |
 
-### dsh-desktop（anywhere-labs）
+---
 
-![1787642279438](../image/README/1787642279438.png)
+## 对比表格
 
-优势：
+| 维度                   |       本项目 (Simple)       |      anywhere-labs      |        Tauri 版        |
+| ---------------------- | :-------------------------: | :---------------------: | :---------------------: |
+| **框架**         |         Electron 43         |       Electron 28       |         Tauri 2         |
+| **前端**         |     纯原生 HTML/CSS/JS     |      React + Vite      |      React + Vite      |
+| **代码量**       |          ~3.5k 行          |         ~8k 行         |         ~15k 行         |
+| **运行时捆绑**   |          ❌ 不捆绑          |       ✅ 捆绑 dsh       |        ❌ 不捆绑        |
+| **第三方依赖**   | 1 个 (`electron-menubar`) |          多个          |    多个 (Rust crate)    |
+| **托盘**         |        ✅ 类原生自绘        |       ✅ 系统托盘       |       ✅ 系统托盘       |
+| **全局快捷键**   |          ✅ 可录制          |           ✅           |           ✅           |
+| **开机自启**     |             ✅             |           ❌           |           ❌           |
+| **窗口拖拽**     |       ✅ 自定义标题栏       |      ✅ 系统标题栏      |      ✅ 系统标题栏      |
+| **Acrylic 背景** |             ✅             |           ❌           |           ❌           |
+| **设置页**       |     ✅ 环境检测 + 日志     |           ❌           |         ✅ 基础         |
+| **安全隔离**     |         ✅ sandbox         |        ⚠️ 部分        |           ✅           |
+| **打包格式**     |       NSIS + Portable       |          NSIS          |       MSI + NSIS       |
+| **平台**         |           Windows           | Windows / macOS / Linux | Windows / macOS / Linux |
+| **自动更新**     |           ❌ 手动           |           ❌           |           ✅           |
 
-- 插件生态成熟：一切皆插件（Cordis），桌面壳本身也是插件，内置社区市场
-- 开箱即用：下载即用，无需预装 Node.js
-- 自更新：自定义版本检查 + 下载安装流程
-- 窗口能力丰富：Windows `titleBarOverlay` + Mica，macOS `hiddenInset` + 毛玻璃
-- 托盘菜单项丰富（打开桌面 / profiles / 状态 / 模式切换 / 退出）
-- 无法复用全局dsh的插件
+---
 
-劣势：
+## anywhere-labs (dsh-desktop)
 
-- 代码复杂：monorepo + Cordis + React，约 33k 行，修改成本高
-- 无全局快捷键（仅窗口内 Zoom 快捷键）
-- 托盘为 Electron 原生菜单，样式与系统原生不一致，且功能过于复杂
-- 深度绑定上游：固定版本 Harness（submodule）+ 大量 `@deepseek-ai/dsh-*` 依赖
-- 应用图标与托盘图标不一致
+**仓库**：[anywhere-labs/dsh-desktop](https://github.com/anywhere-labs/dsh-desktop)
 
-> 本项目灵感来源于其 v1.0.0 版本，但细节方面存在不足，且 v2.0.0 版本太过臃肿，
-> 窗口和托盘不够简洁美观，因此产生了此项目，以实现更轻便的 DSH 桌面版本。
+### 优势
 
-### deepseek-harness-desktop（Tauri 版）
+- **多平台支持**：Windows、macOS、Linux 三平台完整构建配置
+- **捆绑运行时**：内置 dsh，用户无需预装环境，下载即用
+- **成熟度高**：较早的社区项目，Stars 和用户基数较大
+- **React 生态**：前端使用 React + Vite，便于二次开发
 
-![1787640851492](../image/README/1787640851492.png)
+### 劣势
 
-优势：
+- **体积大**：捆绑 dsh 运行时导致安装包体积显著增加
+- **耦合度高**：内置 dsh 版本固定，升级需发新版，无法跟随系统 dsh 升级
+- **依赖多**：引入 React、Vite 等前端构建链，代码量 ~8k 行
+- **功能缺失**：无开机自启、无环境检测、无日志管理
+- **安全较弱**：contextIsolation 配置不够严格，部分窗口未启用 sandbox
+- **窗口体验**：使用系统原生标题栏，无法自定义拖拽区域和亚克力效果
 
-- 多平台：Windows / macOS / Linux 全平台产物
-- 自更新：自定义自更新（GitHub Release）
-- 档案隔离：多档案隔离，插件 / 补丁 / 设置互不干扰
-- 本地环境复用：检测到系统已有兼容 Node / Pnpm 时优先复用
-- CLI 集成：自动注册 `dsh` 命令 shim
-- 托盘：Rust 原生，macOS 模板图标贴近系统原生
+---
 
-劣势：
+## Tauri 版 (deepseek-harness-desktop)
 
-- 首次启动需下载 Node 运行时 + Harness 内核，安装速度缓慢；卸载残留会导致
-  DSH 无法启动，需手动删除本地连接插件
-- 无全局快捷键（未注册 `tauri-plugin-global-shortcut`）
-- 无边框窗口（`decorations(false)`），自绘标题栏与内容区域割裂，且 Harness Web UI
-  通过 `<iframe>` 加载，壁纸四周出现黑边，视觉上不完整
-- 托盘菜单仅「打开面板 / 退出」两项，缺少丰富交互
+**仓库**：[Hyrinx/deepseek-harness-desktop](https://github.com/Hyrinx/deepseek-harness-desktop)（Tauri 分支）
 
-> 本项目尝试过 Tauri 架构，也遇到上述问题，如悬浮标题栏无法拖动的同时穿透底部可交互控件，
-> wallpaper-engine 壁纸出现黑色区域。
+### 优势
 
-## 为什么选择本项目
+- **Tauri 2 框架**：基于 Rust，内存占用更低，启动更快
+- **多平台**：Windows、macOS、Linux 三平台
+- **自动更新**：内置 Tauri updater，支持自动更新
+- **安全**：Tauri 沙箱模型，CSP 严格限制
+- **现代前端**：React + Vite，热更新开发体验好
 
-![1787642455590](../image/README/1787642455590.png)
+### 劣势
 
-1. **简介（核心优势）** — Native-First 架构，主进程只用 Node 内置模块 + 1 个轻量
-   托盘封装，前端纯原生，零框架。整个壳约 3.5k 行代码，结构清晰，
-   **易于阅读、修改与审计**。
-2. **完整窗口体验** — 自定义悬浮标题栏（Windows `titleBarOverlay` + Acrylic，
-   macOS 红绿灯 + 毛玻璃），Harness 壁纸**铺满整个窗口（无黑边）**。
-3. **全局快捷键** — 全局显示/隐藏主窗口，默认 `Ctrl+Shift+Space`，设置页实时录制。
-4. **类原生托盘** — 自绘无边框透明圆角托盘菜单，左键显隐、右键菜单，交互贴近原生。
-5. **安全加固** — `contextIsolation` + `sandbox` + 权限拒绝 + 导航限制，默认最小权限。
-6. **透明可控** — 不捆绑、不魔改上游，完全复用系统 `dsh`，升级 `dsh` 即升级能力。
+- **代码量大**：~15k 行，Rust 后端 + React 前端，维护成本高
+- **Rust 门槛**：需要 Rust 工具链，贡献门槛较高
+- **编译慢**：Rust 编译耗时，CI/CD 构建时间长
+- **依赖重**：Cargo.toml 引入多个 Rust crate，npm 引入 React 全家桶
+- **不捆绑 dsh**：与 Simple 版一样需预装环境，但未提供环境检测引导
+- **设置页简陋**：仅基础配置，无环境检测、日志管理
+- **窗口体验**：系统原生标题栏，无自定义拖拽和亚克力效果
+
+---
+
+## 本项目定位
+
+**DeepSeek Harness Desktop Simple** 的核心理念是 **「简介」**：
+
+- 代码量最小（~3.5k 行），零前端框架，纯原生实现
+- 仅 1 个第三方运行时依赖（`electron-menubar`）
+- 桌面体验完整：自定义标题栏拖拽、Acrylic 亚克力背景、类原生自绘托盘
+- 设置页功能齐全：环境检测 + 一键更新 + 日志管理 + 快捷键录制 + 开机自启
+- 安全到位：`contextIsolation` + `sandbox` + 权限拒绝 + 导航限制
+
+**适合人群**：希望代码简洁、易于理解和修改的开发者；偏好「薄壳」理念、不愿捆绑运行时的用户。
+
+---
+
+## 总结
+
+| 如果你需要...                      | 推荐                        |
+| ---------------------------------- | --------------------------- |
+| 下载即用、不关心体积               | anywhere-labs (dsh-desktop) |
+| 跨平台、自动更新、不在意 Rust 门槛 | Tauri 版                    |
+| 代码简洁、易修改、桌面体验好       | **本项目 (Simple)**   |

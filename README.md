@@ -51,7 +51,7 @@ DeepSeek Harness Desktop Simple是一个基于 Electron 的轻量桌面壳，采
 
 ## 预览
 
-![1787643103745](image/README/1787643103745.png)
+![预览](image/README/own.png)
 
 ## 与其他 DSH 桌面壳的对比
 
