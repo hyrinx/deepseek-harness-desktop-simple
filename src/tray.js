@@ -98,20 +98,40 @@ function trayImage() {
 }
 
 /**
- * 计算托盘菜单窗口的屏幕位置。
+ * 计算托盘菜单窗口的屏幕位置（自适应，右侧优先）。
  *
- * 默认定位鼠标右上角（菜单左边缘在鼠标右侧，底边缘在鼠标上方）；
- * 若鼠标上方空间不足（如 Linux 顶部面板托盘）则向下展开；
- * 左右越界时向内收缩，保证菜单始终落在当前屏幕工作区内。
+ * 依次尝试 4 个方位，选择第一个完全落在屏幕工作区内的：
+ *   ① 右-上（首选）  ② 右-下  ③ 左-上  ④ 左-下
+ * 若全部越界则贴边 + 右侧优先兜底。
  */
 function calcMenuBounds(mousePos, menuSize) {
   const ca = screen.getDisplayNearestPoint(mousePos).workArea
-  const fitAbove = (mousePos.y - menuSize.height) >= ca.y
-  const menuY = fitAbove ? Math.round(mousePos.y - menuSize.height) : Math.round(mousePos.y)
-  let menuX = Math.round(mousePos.x)
-  const maxX = ca.x + ca.width - menuSize.width
-  if (menuX > maxX) menuX = Math.max(ca.x, Math.round(mousePos.x - menuSize.width))
-  return { x: menuX, y: menuY, width: menuSize.width, height: menuSize.height }
+  const { width: mw, height: mh } = menuSize
+
+  const fits = (x, y) =>
+    x >= ca.x && x + mw <= ca.x + ca.width &&
+    y >= ca.y && y + mh <= ca.y + ca.height
+
+  // 优先级：右侧优先
+  const candidates = [
+    { x: mousePos.x,        y: mousePos.y - mh },  // 右-上
+    { x: mousePos.x,        y: mousePos.y       },  // 右-下
+    { x: mousePos.x - mw,   y: mousePos.y - mh },  // 左-上
+    { x: mousePos.x - mw,   y: mousePos.y       },  // 左-下
+  ]
+
+  for (const c of candidates) {
+    const cx = Math.round(c.x)
+    const cy = Math.round(c.y)
+    if (fits(cx, cy)) return { x: cx, y: cy, width: mw, height: mh }
+  }
+
+  // 兜底：全部越界，贴边 + 右侧优先
+  let x = Math.round(mousePos.x)
+  if (x + mw > ca.x + ca.width) x = Math.max(ca.x, ca.x + ca.width - mw)
+  let y = Math.round(mousePos.y - mh)
+  if (y < ca.y) y = Math.max(ca.y, ca.y + ca.height - mh)
+  return { x, y, width: mw, height: mh }
 }
 
 /**
