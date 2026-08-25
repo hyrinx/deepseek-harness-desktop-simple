@@ -9,7 +9,7 @@
 //   src/dsh-home.js   — DSH 路径解析（与 @deepseek-ai/dsh-home-paths 一致）
 //   src/host.js       — dsh 子进程管理（spawn / 就绪 / 终止）
 //   src/windows.js    — 主窗口 + 设置窗口（创建 / 导航 / 显示切换）
-//   src/tray.js       — 托盘 + 托盘菜单（electron-menubar 封装）
+//   src/tray.js       — 托盘 + 托盘菜单（原生 Tray + BrowserWindow）
 //   src/autostart.js  — 开机自启
 //   src/ipc.js        — IPC 处理器 + 全局快捷键 + 窗口拖拽
 //   src/lifecycle.js  — 生命周期（destroyUI / 退出 / 重启 / 启动）

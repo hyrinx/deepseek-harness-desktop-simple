@@ -16,8 +16,8 @@ function destroyUI() {
     hasTrayMenu: Boolean(state.trayMenu),
     hasSettingsWindow: Boolean(state.settingsWindow),
   })
-  clearRef('trayMenu')  // 先销毁 menubar（内部会销毁 mb.tray）
-  clearRef('tray')      // 再销毁 Electron Tray（兜底，mb.tray 可能已被 trayMenu 销毁）
+  clearRef('trayMenu')  // 先销毁菜单窗口（内部会销毁 tray）
+  clearRef('tray')      // 再销毁 Electron Tray（兜底，tray 可能已被 trayMenu 销毁）
   if (state.settingsWindow && !state.settingsWindow.isDestroyed()) {
     try { state.settingsWindow.destroy() } catch (err) { logEvent('ui.destroy.settings-window.fail', { err }, 'warn') }
     state.settingsWindow = null

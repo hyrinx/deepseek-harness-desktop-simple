@@ -109,7 +109,5 @@
     "electron-builder": "^26.15.7",
     "sharp": "^0.35.3"
   },
-  "dependencies": {
-    "electron-menubar": "^10.2.1"
-  }
+  "dependencies": {}
 }

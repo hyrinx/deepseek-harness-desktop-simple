@@ -1,15 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
-// 托盘 + 托盘菜单（electron-menubar 封装）
+// 托盘 + 托盘菜单（原生 Tray + BrowserWindow，零第三方依赖）
 // 菜单视觉层（HTML/尺寸/preload 常量）与窗口管理都在本文件。
 //
 // 注意：修改下方 CSS/MENU_HEIGHT 时请同步更新 MENU_HEIGHT 计算。
 // ═══════════════════════════════════════════════════════════════
 
 const { join } = require('node:path')
-const { nativeImage, ipcMain, screen } = require('electron')
-const { menubar } = require('electron-menubar')
+const { nativeImage, ipcMain, screen, Tray, BrowserWindow } = require('electron')
 const { state, logEvent } = require('./state')
-const { APP_NAME, ICON_PATH, IS_WIN, IS_LINUX } = require('./constants')
+const { APP_NAME, ICON_PATH, IS_MAC, IS_LINUX } = require('./constants')
 
 // ── 托盘菜单：常量 + 内联 HTML ──
 
@@ -99,30 +98,37 @@ function trayImage() {
 }
 
 /**
- * electron-menubar 封装：自建 Tray，重绑左右键语义。
+ * 计算托盘菜单窗口的屏幕位置。
  *
- * 位置修正（Windows / Linux）：electron-menubar 在 Windows 下每次
- * showWindow 都会调用 applyWindowPosition → getWindowPosition() 覆盖
- * windowPosition 为 'bottomRight'（屏幕右下角）。我们通过 monkey-patch
- * 跳过原始逻辑，直接用鼠标位置 + setBounds 定位：默认菜单左边缘在鼠标
- * 右侧、底边缘在鼠标上方（鼠标右上角）；若鼠标上方空间不足（如 Linux
- * 顶部面板托盘）则自动向下展开，并在左右溢出时向内收缩，保证菜单不越界。
+ * 默认定位鼠标右上角（菜单左边缘在鼠标右侧，底边缘在鼠标上方）；
+ * 若鼠标上方空间不足（如 Linux 顶部面板托盘）则向下展开；
+ * 左右越界时向内收缩，保证菜单始终落在当前屏幕工作区内。
+ */
+function calcMenuBounds(mousePos, menuSize) {
+  const ca = screen.getDisplayNearestPoint(mousePos).workArea
+  const fitAbove = (mousePos.y - menuSize.height) >= ca.y
+  const menuY = fitAbove ? Math.round(mousePos.y - menuSize.height) : Math.round(mousePos.y)
+  let menuX = Math.round(mousePos.x)
+  const maxX = ca.x + ca.width - menuSize.width
+  if (menuX > maxX) menuX = Math.max(ca.x, Math.round(mousePos.x - menuSize.width))
+  return { x: menuX, y: menuY, width: menuSize.width, height: menuSize.height }
+}
+
+/**
+ * 原生 Tray + BrowserWindow 托盘菜单（零第三方依赖）。
  *
- * macOS 上不需要 monkey-patch：electron-menubar 的 trayCenter 在菜单栏
- * 图标下方原生定位已正确。
- *
- * 垂直偏移修复：menubar 内部在 showWindow 时可能重置窗口尺寸为
- * browserWindow 配置的初始值（200x200），导致 getBounds().height
- * 返回错误值 → 定位偏移。改用 did-finish-load 后缓存的 menuSize，
- * 通过 setBounds 一次性设置位置+尺寸，彻底消除偏移。
+ * 左键单击：显隐主窗口
+ * 右键单击：弹出菜单窗口，点击菜单项执行对应操作
+ * 菜单失焦时自动隐藏
  */
 function createTrayAndMenu(callbacks) {
   logEvent('tray.create.start')
   const { onShowMain, onSettings, onOpenLogs, onRestart, onQuit } = callbacks
 
+  // ── IPC：菜单项点击 ──
   ipcMain.on('tray-menu-select', (_e, action) => {
     logEvent('ipc.tray-menu-select', { action })
-    state.trayMenu?.hide?.()
+    hideMenuWindow()
     const fn = { show: onShowMain, settings: onSettings,
       logs: onOpenLogs, restart: onRestart, quit: onQuit }[action]
     if (!fn) return
@@ -135,36 +141,86 @@ function createTrayAndMenu(callbacks) {
     }
   })
 
-  const mb = menubar({
-    icon: trayImage(),
-    tooltip: APP_NAME,
-    index: `data:text/html;charset=utf-8,${encodeURIComponent(MENU_HTML)}`,
-    preloadWindow: true,
-    windowPosition: IS_WIN ? 'trayBottomCenter' : 'trayCenter',
-    browserWindow: {
+  // ── 创建托盘 ──
+  const tray = new Tray(trayImage())
+  if (!IS_MAC) tray.setToolTip(APP_NAME)  // macOS 菜单栏图标不支持 tooltip
+  state.tray = tray
+  logEvent('tray.created', { trayExists: Boolean(tray) })
+
+  tray.on('click', (_e, bounds) => {
+    logEvent('tray.click', { bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null })
+    try {
+      const { showWindow } = require('./windows')
+      showWindow()
+    } catch (err) { logEvent('tray.click.showWindow.fail', { err }, 'error') }
+  })
+
+  tray.on('right-click', (_e, bounds) => {
+    logEvent('tray.right-click', {
+      bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null,
+    })
+    showMenuWindow()
+  })
+
+  tray.on('double-click', () => logEvent('tray.double-click'))
+  tray.on('destroy', () => logEvent('tray.destroy', { isQuitting: state.isQuitting }, state.isQuitting ? 'info' : 'warn'))
+  tray.on('balloon-show', () => logEvent('tray.balloon-show'))
+  tray.on('balloon-click', () => logEvent('tray.balloon-click'))
+  tray.on('balloon-closed', () => logEvent('tray.balloon-closed'))
+
+  // ── 菜单窗口（懒创建，复用；移到屏幕外代替 hide 消除频闪） ──
+  //
+  // 频闪根因：frameless 透明窗口在 hide() → show() 循环中，每次 show() 都会在
+  // Windows 上重建原生窗口表面（HWND surface），重建瞬间短暂露出白色/默认背景。
+  // 解决方案：窗口只 show() 一次，后续"隐藏"时移到屏幕外（-9999, -9999），
+  // "显示"时移回目标位置。窗口表面永不销毁，也无需 opacity/鼠标穿透的 hack。
+  const OFFSCREEN = { x: -9999, y: -9999 }
+  let menuWin = null
+  let menuSize = { width: MENU_WIDTH, height: MENU_HEIGHT }
+  let menuReady = false
+  let pendingShowPos = null
+
+  function getOrCreateMenuWindow() {
+    if (menuWin && !menuWin.isDestroyed()) return menuWin
+
+    menuWin = new BrowserWindow({
       width: MENU_WIDTH, height: MENU_HEIGHT,
-      frame: false, transparent: true, resizable: false, movable: false,
+      show: false,
+      frame: false,
+      transparent: !IS_LINUX,  // Linux 部分桌面环境（Xfce/MATE/无合成器）不支持透明窗口
+      resizable: false, movable: false,
       skipTaskbar: true, alwaysOnTop: true, focusable: true,
-      fullscreenable: false, hasShadow: false, backgroundColor: '#00000000',
+      fullscreenable: false, hasShadow: false,
+      backgroundColor: IS_LINUX ? '#ffffff' : '#00000000',
       webPreferences: {
         preload: PRELOAD_PATH,
         contextIsolation: true, nodeIntegration: false, sandbox: true,
       },
-    },
-  })
+    })
+    logEvent('menu-window.created', { id: menuWin.id })
 
-  mb.on('after-create-window', () => {
-    try { mb.window?.setAlwaysOnTop?.(true, 'screen-saver') }
-    catch (err) { logEvent('menubar.topmost.fail', { err }, 'warn') }
-    logEvent('menubar.window.created', { id: mb.window?.id })
+    try { menuWin.setAlwaysOnTop(true, 'screen-saver') }
+    catch (err) { logEvent('menu-window.topmost.fail', { err }, 'warn') }
 
-    // 初始取已知真实尺寸，避免 did-finish-load 异步测量前使用假尺寸（200x200）
-    let menuSize = { width: MENU_WIDTH, height: MENU_HEIGHT }
+    // 内容就绪后：移到屏幕外再 show()，初始化窗口表面但对用户不可见
+    menuWin.once('ready-to-show', () => {
+      menuReady = true
+      menuWin.setBounds({ ...OFFSCREEN, width: menuSize.width, height: menuSize.height })
+      menuWin.show()
+
+      if (pendingShowPos && menuWin && !menuWin.isDestroyed()) {
+        const bounds = calcMenuBounds(pendingShowPos, menuSize)
+        menuWin.setBounds(bounds)
+        menuWin.focus()
+        pendingShowPos = null
+        logEvent('menu-window.first-show', { bounds })
+      }
+    })
 
     // 内容加载后测量实际尺寸，自适应窗口宽高
-    mb.window.webContents.on('did-finish-load', () => {
+    menuWin.webContents.on('did-finish-load', () => {
       try {
-        mb.window.webContents.executeJavaScript(`
+        menuWin.webContents.executeJavaScript(`
           (function() {
             var body = document.body
             var html = document.documentElement
@@ -173,86 +229,69 @@ function createTrayAndMenu(callbacks) {
             return { width: Math.ceil(w), height: Math.ceil(h) }
           })()
         `).then((size) => {
-          if (size && mb.window && !mb.window.isDestroyed()) {
+          if (size && menuWin && !menuWin.isDestroyed()) {
             menuSize = { width: size.width, height: size.height }
-            mb.window.setSize(size.width, size.height)
-            logEvent('menubar.resize', { width: size.width, height: size.height })
+            menuWin.setSize(size.width, size.height)
+            logEvent('menu-window.resize', { width: size.width, height: size.height })
           }
         }).catch(() => {})
-      } catch (err) { logEvent('menubar.resize.fail', { err }, 'warn') }
+      } catch (err) { logEvent('menu-window.resize.fail', { err }, 'warn') }
     })
 
-    // Windows / Linux：monkey-patch 用 setBounds 一次性设置位置+尺寸。
-    // 默认定位鼠标右上角；上方空间不足时向下展开，左右越界时向内收缩，
-    // 保证菜单始终落在当前屏幕工作区内。macOS 不覆盖，用 menubar 默认定位。
-    if (IS_WIN || IS_LINUX) {
-      mb.applyWindowPosition = () => {
-        const mp = state.trayMenu?._mousePos
-        if (mp && mb.window && !mb.window.isDestroyed()) {
-          try {
-            const ca = screen.getDisplayNearestPoint(mp).workArea
-            const fitAbove = (mp.y - menuSize.height) >= ca.y
-            const menuY = fitAbove ? Math.round(mp.y - menuSize.height) : Math.round(mp.y)
-            let menuX = Math.round(mp.x)
-            const maxX = ca.x + ca.width - menuSize.width
-            if (menuX > maxX) menuX = Math.max(ca.x, Math.round(mp.x - menuSize.width))
-            mb.window.setBounds({
-              x: menuX,
-              y: menuY,
-              width: menuSize.width,
-              height: menuSize.height,
-            })
-          } catch (err) {
-            logEvent('menubar.reposition.fail', { err }, 'warn')
-          }
-        }
-      }
-    }
-  })
-  mb.on('show', () => logEvent('menubar.show'))
-  mb.on('hide', () => logEvent('menubar.hide'))
+    // 失焦后移到屏幕外（不销毁窗口表面）
+    menuWin.on('blur', () => {
+      logEvent('menu-window.blur')
+      hideMenuWindow()
+    })
 
+    menuWin.on('closed', () => {
+      logEvent('menu-window.closed')
+      menuWin = null
+      menuReady = false
+    })
+
+    menuWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(MENU_HTML)}`)
+    return menuWin
+  }
+
+  function showMenuWindow() {
+    const win = getOrCreateMenuWindow()
+    const mousePos = screen.getCursorScreenPoint()
+
+    if (menuReady) {
+      const bounds = calcMenuBounds(mousePos, menuSize)
+      logEvent('menu-window.position', { mousePos, bounds })
+      win.setBounds(bounds)
+      win.focus()
+    } else {
+      pendingShowPos = mousePos
+      logEvent('menu-window.pending-show', { mousePos })
+    }
+  }
+
+  function hideMenuWindow() {
+    if (menuWin && !menuWin.isDestroyed()) {
+      try {
+        menuWin.setBounds({ ...OFFSCREEN, width: menuSize.width, height: menuSize.height })
+      } catch (err) { logEvent('menu-window.hide.fail', { err }, 'warn') }
+    }
+  }
+
+  // ── 暴露给外部的托盘菜单接口 ──
   state.trayMenu = {
-    show: (bounds) => {
-      state.trayMenu._mousePos = screen.getCursorScreenPoint()
-      return mb.showWindow(bounds)
-    },
-    hide: () => { try { mb.hideWindow() } catch (e) { logEvent('menubar.hide.fail', { err: e }, 'warn') } },
+    show: showMenuWindow,
+    hide: hideMenuWindow,
     destroy: () => {
-      try { mb.window?.isDestroyed?.() || mb.window?.destroy?.() } catch {}
-      try { mb.tray?.destroy?.() } catch {}
+      if (menuWin && !menuWin.isDestroyed()) {
+        try { menuWin.destroy() } catch {}
+        menuWin = null
+      }
+      if (tray && !tray.isDestroyed()) {
+        try { tray.destroy() } catch {}
+      }
     },
   }
-  logEvent('menubar.create.ok')
-
-  mb.on('ready', () => {
-    const tray = mb.tray
-    state.tray = tray
-    logEvent('menubar.ready', { trayExists: Boolean(tray) })
-    if (!tray) return
-
-    tray.removeAllListeners('click')
-    tray.removeAllListeners('right-click')
-
-    tray.on('click', (_e, bounds) => {
-      logEvent('tray.click', { bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null })
-      try {
-        const { showWindow } = require('./windows')
-        showWindow()
-      } catch (err) { logEvent('tray.click.showWindow.fail', { err }, 'error') }
-    })
-    tray.on('right-click', (_e, bounds) => {
-      logEvent('tray.right-click', {
-        bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null,
-      })
-      state.trayMenu?.show?.(bounds)
-    })
-    tray.on('double-click', () => logEvent('tray.double-click'))
-    tray.on('destroy', () => logEvent('tray.destroy', { isQuitting: state.isQuitting }, state.isQuitting ? 'info' : 'warn'))
-    tray.on('balloon-show', () => logEvent('tray.balloon-show'))
-    tray.on('balloon-click', () => logEvent('tray.balloon-click'))
-    tray.on('balloon-closed', () => logEvent('tray.balloon-closed'))
-  })
+  logEvent('tray.create.ok')
 }
 
 module.exports = { createTrayAndMenu }
