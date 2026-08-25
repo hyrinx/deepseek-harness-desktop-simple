@@ -1,11 +1,12 @@
 {
   "name": "deepseek-harness-desktop-simple",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "DeepSeek Harness 轻量桌面包装",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "set NODE_OPTIONS=--use-system-ca && electron-builder --win"
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
   },
   "build": {
     "appId": "com.hyrinx.deepseek-harness-desktop-simple",
@@ -42,6 +43,27 @@
       "installerHeaderIcon": "assets/app.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/app.ico",
+      "category": "Utility",
+      "maintainer": "Hyrinx",
+      "synopsis": "DeepSeek Harness 轻量桌面包装",
+      "description": "基于 Electron 的 DeepSeek Harness 轻量桌面壳，Native-First 架构。"
     }
   },
   "author": "Hyrinx",

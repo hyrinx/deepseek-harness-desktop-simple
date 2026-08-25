@@ -7,7 +7,7 @@ const { BrowserWindow, shell } = require('electron')
 const { state, logEvent, bootMark } = require('./state')
 const {
   APP_NAME, ICON_PATH, SETTINGS_HTML, PRELOAD_SETTINGS,
-  MAIN_WIN, SETTINGS_WIN, IS_WIN, IS_MAC,
+  MAIN_WIN, SETTINGS_WIN, IS_WIN, IS_MAC, IS_LINUX,
   INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 } = require('./constants')
 
@@ -39,7 +39,7 @@ function buildMainWindowOptions() {
   const base = {
     ...MAIN_WIN,
     show: false,
-    frame: IS_WIN,
+    frame: IS_WIN || IS_LINUX,
     titleBarStyle: IS_MAC ? 'hiddenInset' : 'hidden',
     title: APP_NAME,
     icon: ICON_PATH,

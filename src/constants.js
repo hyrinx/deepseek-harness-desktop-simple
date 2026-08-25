@@ -26,6 +26,7 @@ const SETTINGS_WIN = Object.freeze({
 
 const IS_WIN = process.platform === 'win32'
 const IS_MAC = process.platform === 'darwin'
+const IS_LINUX = process.platform === 'linux'
 
 const AUTOSTART_ARG = '--from-autostart'
 
@@ -181,7 +182,7 @@ module.exports = {
   ICON_PATH, SETTINGS_HTML, PRELOAD_SETTINGS,
   DEFAULT_SHORTCUT, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT,
   MAIN_WIN, SETTINGS_WIN,
-  IS_WIN, IS_MAC, AUTOSTART_ARG,
+  IS_WIN, IS_MAC, IS_LINUX, AUTOSTART_ARG,
   appRootDir, dshHomePath, logDirPath, logFilePath, configFilePath,
   INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 }

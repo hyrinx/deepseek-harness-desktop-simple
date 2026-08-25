@@ -5,7 +5,7 @@
 const { spawn } = require('node:child_process')
 const { app } = require('electron')
 const { state, logEvent, logWriter, bootMark } = require('./state')
-const { IS_WIN, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT } = require('./constants')
+const { IS_WIN, IS_LINUX, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT } = require('./constants')
 
 function spawnDshWeb() {
   bootMark('spawn dsh web')
@@ -85,6 +85,13 @@ function killHostTree(child) {
   if (IS_WIN && child.pid) {
     try {
       spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true })
+      return
+    } catch { /* fallback 到 child.kill */ }
+  }
+  // Linux/macOS：先尝试杀死进程组，失败则回退到单进程 kill
+  if (IS_LINUX && child.pid) {
+    try {
+      process.kill(-child.pid, 'SIGTERM')
       return
     } catch { /* fallback 到 child.kill */ }
   }
