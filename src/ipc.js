@@ -192,6 +192,14 @@ function registerIpcHandlers() {
   ipcMain.on('close-window', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close()
   })
+
+  // 悬浮标题栏双击最大化/还原
+  ipcMain.handle('window-toggle-maximize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
+  })
 }
 
 module.exports = { registerIpcHandlers, registerGlobalShortcut }

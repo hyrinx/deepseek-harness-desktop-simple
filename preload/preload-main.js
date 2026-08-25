@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld('windowDrag', {
   },
   end: () => {
     ipcRenderer.send('window-drag-end')
+  },
+  toggleMaximize: () => {
+    ipcRenderer.invoke('window-toggle-maximize')
   }
 })

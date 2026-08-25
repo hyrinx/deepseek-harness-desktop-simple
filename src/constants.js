@@ -147,6 +147,14 @@ const INJECT_DRAG_SCRIPT = `
   }
   document.addEventListener('mouseup', stopDrag)
   window.addEventListener('mouseup', stopDrag)
+
+  // 悬浮标题栏双击最大化/还原
+  document.addEventListener('dblclick', function(e) {
+    if (e.clientY > 44) return
+    if (isInteractive(e.target)) return
+    if (!window.windowDrag || !window.windowDrag.toggleMaximize) return
+    window.windowDrag.toggleMaximize()
+  })
 })()`
 
 // Win32 会话头部避让窗口控制按钮区域
