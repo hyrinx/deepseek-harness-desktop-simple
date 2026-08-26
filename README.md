@@ -64,6 +64,7 @@ DeepSeek Harness Desktop Simple是一个基于 Electron 的轻量桌面壳，采
 dsh-desktop（anywhere-labs）与 deepseek-harness-desktop（Tauri 版）两个参考项目的
 详细优劣势分析。
 
+
 ## 快速开始
 
 ### 环境安装
@@ -193,14 +194,14 @@ DeepSeek Harness/
 > 分别覆盖 X11 与 Wayland 会话）上验证：
 
 - [ ] **托盘图标与菜单** — 托盘图标能否正常显示（当前使用 `.ico`，需确认 Linux 下
-      `nativeImage` 能正确解码）；左键显隐窗口、右键打开菜单的定位方向是否正确；
-      靠近屏幕边缘时菜单是否会溢出到屏幕外
+  `nativeImage` 能正确解码）；左键显隐窗口、右键打开菜单的定位方向是否正确；
+  靠近屏幕边缘时菜单是否会溢出到屏幕外
 - [ ] **窗口边框与背景** — Linux 下 `frame` + `titleBarStyle` + `transparent`
-      组合实际渲染效果；Wayland 会话下透明背景是否失效、原生标题栏是否遮挡内容
+  组合实际渲染效果；Wayland 会话下透明背景是否失效、原生标题栏是否遮挡内容
 - [ ] **开机自启** — `app.setLoginItemSettings` 在 Linux 下是否生效/兜底，设置页
-      开关是否有异常；`.desktop autostart` 是否随桌面环境正常工作
+  开关是否有异常；`.desktop autostart` 是否随桌面环境正常工作
 - [ ] **进程树清理** — 退出/重启后确认 `dsh` 子进程及其派生进程被整组终止
-      （`process.kill(-pid)` 依赖 `detached` 生效），无残留孤儿进程
+  （`process.kill(-pid)` 依赖 `detached` 生效），无残留孤儿进程
 - [ ] **全局快捷键 / 单实例锁 / 关闭隐藏到托盘** — 与 Windows 一致的核心交互是否正常
 
 ### macOS（尚未真机验证）
@@ -208,19 +209,19 @@ DeepSeek Harness/
 > 构建已通过 dmg / zip（x64 + arm64），以下运行期行为**必须**在真机上验证：
 
 - [ ] **托盘图标** — macOS 下 `nativeImage.createFromPath` 读取 `.ico`（`favicon.ico`）
-      是否返回空图标（NSImage 对 ICO 支持有限）。若为空则需改用 `.png`/`.icns`
+  是否返回空图标（NSImage 对 ICO 支持有限）。若为空则需改用 `.png`/`.icns`
 - [ ] **托盘菜单定位** — macOS 不 monkey-patch `applyWindowPosition`，验证菜单是否
-      正常定位在菜单栏图标正下方，尺寸是否被 `setSize` 正确自适应
+  正常定位在菜单栏图标正下方，尺寸是否被 `setSize` 正确自适应
 - [ ] **窗口毛玻璃与红绿灯** — `hiddenInset` 红绿灯位置 / `trafficLightPosition` /
-      `vibrancy: sidebar` 毛玻璃/半透明效果是否如实呈现，`setBounds` 拖拽是否正常
+  `vibrancy: sidebar` 毛玻璃/半透明效果是否如实呈现，`setBounds` 拖拽是否正常
 - [ ] **开机自启** — `setLoginItemSettings` 的 LoginItem 是否注册、移除成功
 - [ ] **签名与 Gatekeeper** — 未签名.dmg 安装后右键→打开是否可运行；
-      entitlements 是否满足硬编码运行时（hardenedRuntime）要求
+  entitlements 是否满足硬编码运行时（hardenedRuntime）要求
 
 ### 跨平台通用（每次发版必测）
 
 - [ ] **`dsh web` 拉起与就绪检测** — Node/npm/dsh 版本检测、「一键更新」与插件安装
-      命令（`windowsHide` 相关差异）在各平台 CLI 输出解析是否一致
+  命令（`windowsHide` 相关差异）在各平台 CLI 输出解析是否一致
 - [ ] **日志行为** — `$DSH_HOME/logs/` 路径与写入在各平台的读线程/权限是否正常
 
 ## 常见问题
