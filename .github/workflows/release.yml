@@ -76,13 +76,9 @@ jobs:
         run: |
           set -eo pipefail
           TAG="${{ inputs.tag_name || github.ref_name }}"
-          # 上一版本 tag(已有 fetch-depth: 0 提供完整历史),用于 Full Changelog 对比链接
-          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
-          # 用 tag 让 GitHub 依 commit/PR 生成完整变更记录(含 Contributors)
+          # 用 tag 让 GitHub 依 commit/PR 生成完整变更记录(含 Contributors,末尾自带 Full Changelog 链接)
           NOTES="$(gh api -X POST "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$TAG" --jq '.body')"
           FILE_URL="https://github.com/${{ github.repository }}/releases/download"
-          COMPARE=""
-          [ -n "$PREV" ] && COMPARE="**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV}...${TAG}"
 
           # 依据实际产物文件自动生成下载表(跳过 zip/blockmap/yml 等非安装包)
           {
@@ -127,8 +123,6 @@ jobs:
             echo "## 📝 更新内容"
             echo
             echo "$NOTES"
-            echo
-            [ -n "$COMPARE" ] && echo "$COMPARE"
           } > RELEASE_BODY.md
           echo "RESULT_TAG=$TAG" >> "$GITHUB_ENV"
 

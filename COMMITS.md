@@ -1,5 +1,12 @@
 # COMMITS
 
+## 2026-08-26 15:50:00
+
+fix: 发布正文中 Full Changelog 链接重复
+
+- 根因：`gh api generate-notes` 生成的 NOTES 末尾已自带 `**Full Changelog**: v1.3.0...v1.4.0` 链接，发布脚本又用 `COMPARE` 手动追加了一遍相同内容，导致重复
+- 修复：[release.yml](../.github/workflows/release.yml) 移除手动加 `COMPARE` 的逻辑（连同失效的 `PREV` 变量），仅保留 generate-notes 自带链接
+
 ## 2026-08-26 15:40:00
 
 fix: auto-tag 调度 Release 工作流 403，缺少 actions:write 权限
