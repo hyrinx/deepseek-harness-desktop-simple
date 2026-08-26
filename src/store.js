@@ -5,8 +5,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('node:fs')
-const { dirname, join } = require('node:path')
-const { DEFAULT_SHORTCUT, configFilePath, appRootDir } = require('./constants')
+const { dirname } = require('node:path')
+const { DEFAULT_SHORTCUT, configFilePath } = require('./constants')
 const { logEvent } = require('./state')
 
 function createJsonStore(defaults) {
@@ -15,17 +15,7 @@ function createJsonStore(defaults) {
 
   try {
     data = { ...defaults, ...JSON.parse(fs.readFileSync(filePath, 'utf-8')) }
-  } catch {
-    // 打包模式下新路径无配置 → 尝试从旧路径（exe 旁边）迁移
-    const oldPath = join(appRootDir(), 'config.json')
-    if (oldPath !== filePath) {
-      try {
-        const oldData = JSON.parse(fs.readFileSync(oldPath, 'utf-8'))
-        data = { ...defaults, ...oldData }
-        logEvent('store.migrate', { from: oldPath, to: filePath })
-      } catch { /* 旧路径也无文件 → 使用 defaults */ }
-    }
-  }
+  } catch { /* 文件不存在或解析失败 → 使用 defaults */ }
 
   function save() {
     try {
