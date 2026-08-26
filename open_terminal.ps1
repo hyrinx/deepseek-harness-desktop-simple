@@ -1,0 +1,12 @@
+﻿$histFile = 'D:\代码\DeepSeekHarness\deepseek-harness-desktop-simple\cmd_history.txt'
+try { Set-PSReadLineOption -HistorySavePath $histFile -ErrorAction Stop } catch {}
+Write-Host '  ══════════════════════════════════════'
+Write-Host '  常用命令'
+Write-Host '  ══════════════════════════════════════'
+Write-Host '  dsh plugin --profile web add <name>      安装插件'
+Write-Host '  dsh plugin --profile web remove <name>   删除插件'
+Write-Host '  dsh plugin --profile web list              查看插件列表'
+Write-Host '  npm install -g @deepseek-ai/dsh@latest     更新 dsh'
+Write-Host ''
+Write-Host '  (按↑浏览历史命令，自动保存)'
+Write-Host ''

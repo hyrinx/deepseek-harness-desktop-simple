@@ -4,8 +4,9 @@
 
 const { app, globalShortcut, dialog, session, shell } = require('electron')
 const fs = require('node:fs')
+const { spawn } = require('node:child_process')
 const { state, clearRef, logEvent, logWriter, bootMark } = require('./state')
-const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, logFilePath, appRootDir } = require('./constants')
+const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, logFilePath, appRootDir, configFilePath, IS_WIN, IS_MAC } = require('./constants')
 const { store } = require('./store')
 const { applyAutoStart, isLaunchedByAutostart } = require('./autostart')
 const { registerIpcHandlers, registerGlobalShortcut } = require('./ipc')
@@ -113,6 +114,64 @@ async function openLogFile() {
   else logEvent('logs.open-log.ok', { target })
 }
 
+async function openTerminal() {
+  logEvent('terminal.open')
+  try {
+    if (IS_WIN) {
+      const { join, dirname } = require('node:path')
+      const histFile = join(dirname(configFilePath()), 'cmd_history.txt')
+      const ps1Path = join(dirname(configFilePath()), 'open_terminal.ps1')
+      const ps1 = [
+        `$histFile = '${histFile.replace(/'/g, "''")}'`,
+        `try { Set-PSReadLineOption -HistorySavePath $histFile -ErrorAction Stop } catch {}`,
+        `Write-Host '  ══════════════════════════════════════'`,
+        `Write-Host '  常用命令'`,
+        `Write-Host '  ══════════════════════════════════════'`,
+        `Write-Host '  dsh plugin --profile web add <name>      安装插件'`,
+        `Write-Host '  dsh plugin --profile web remove <name>   删除插件'`,
+        `Write-Host '  dsh plugin --profile web list              查看插件列表'`,
+        `Write-Host '  npm install -g @deepseek-ai/dsh@latest     更新 dsh'`,
+        `Write-Host ''`,
+        `Write-Host '  (按↑浏览历史命令，自动保存)'`,
+        `Write-Host ''`,
+      ].join('\n')
+      fs.writeFileSync(ps1Path, '\uFEFF' + ps1, 'utf-8')  // UTF-8 BOM，解决中文乱码
+      spawn(`start "dsh" powershell -NoExit -ExecutionPolicy Bypass -File "${ps1Path}"`, [], {
+        shell: true, detached: true, windowsHide: false,
+      })
+    } else {
+      const { join, dirname } = require('node:path')
+      const shPath = join(dirname(configFilePath()), IS_MAC ? 'open_terminal.command' : 'open_terminal.sh')
+      const sh = [
+        '#!/bin/bash',
+        'cat << \'EOF\'',
+        '  ═══════════════════════════════════════',
+        '  常用命令',
+        '  ═══════════════════════════════════════════',
+        '  dsh plugin --profile web add <name>      安装插件',
+        '  dsh plugin --profile web remove <name>   删除插件',
+        '  dsh plugin --profile web list              查看插件列表',
+        '  npm install -g @deepseek-ai/dsh@latest     更新 dsh',
+        '',
+        '  (按↑浏览历史命令，自动保存)',
+        '',
+        'EOF',
+        'exec $SHELL',
+      ].join('\n')
+      fs.writeFileSync(shPath, sh, 'utf-8')
+      fs.chmodSync(shPath, 0o755)
+      if (IS_MAC) {
+        spawn('open', ['-a', 'Terminal', shPath], { detached: true })
+      } else {
+        spawn('x-terminal-emulator', ['-e', shPath], { detached: true })
+      }
+    }
+    logEvent('terminal.open.ok')
+  } catch (err) {
+    logEvent('terminal.open.fail', { err }, 'error')
+  }
+}
+
 async function bootstrap() {
   const t0 = Date.now()
   logEvent('bootstrap.start', {
@@ -176,6 +235,7 @@ async function bootstrap() {
       onShowMain: showWindow,
       onSettings: createSettingsWindow,
       onOpenLogs: openLogFile,
+      onOpenTerminal: openTerminal,
       onRestart: requestRestart,
       onQuit: requestQuit,
     })
