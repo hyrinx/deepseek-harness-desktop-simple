@@ -8,6 +8,39 @@ on:
   workflow_dispatch:
 
 jobs:
+  auto-tag:
+    # 版本变化后自动打 tag:读取 package.json 的 version,若对应 vX.Y.Z tag 不存在则自动创建并推送,
+    # 从而触发 release.yml 自动发布;版本未变化时跳过。
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 版本变化自动打 tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          V="$(node -p "require('./package.json').version")"
+          TAG="v$V"
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "tag $TAG 已存在,无需重复打 tag"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "已自动打 tag: $TAG(将触发 Release 工作流)"
+
   build:
     strategy:
       fail-fast: false

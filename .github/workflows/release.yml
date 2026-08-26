@@ -58,6 +58,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 需要完整历史与 tag：用于按“上一个 tag”区间自动生成发布说明
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -66,22 +69,66 @@ jobs:
       - name: 列出产物
         run: ls -R dist/
 
-      - name: 生成发布说明(手写模板 + 自动 Changelog)
+      - name: 生成发布说明(自动下载表 + 自动更新记录)
         id: notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -eo pipefail
           TAG="${{ inputs.tag_name || github.ref_name }}"
+          # 上一版本 tag(已有 fetch-depth: 0 提供完整历史),用于 Full Changelog 对比链接
+          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           # 用 tag 让 GitHub 依 commit/PR 生成完整变更记录(含 Contributors)
           NOTES="$(gh api -X POST "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$TAG" --jq '.body')"
+          FILE_URL="https://github.com/${{ github.repository }}/releases/download"
+          COMPARE=""
+          [ -n "$PREV" ] && COMPARE="**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV}...${TAG}"
+
+          # 依据实际产物文件自动生成下载表(跳过 zip/blockmap/yml 等非安装包)
           {
-            echo "## 发布说明"
+            echo "## 📦 安装包"
             echo
-            cat release-template.md
+            echo "| 平台 | 格式 | 关联 |"
+            echo "| --- | --- | --- |"
+            for dir in windows macos linux; do
+              [ -d "dist/$dir" ] || continue
+              case "$dir" in
+                windows) plat="🪟 Windows" ;;
+                macos)   plat="🍎 macOS" ;;
+                linux)   plat="🐧 Linux" ;;
+              esac
+              for f in "dist/$dir"/*; do
+                [ -f "$f" ] || continue
+                name="$(basename "$f")"
+                lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+                case "$f" in
+                  *.exe)
+                    case "$lower" in
+                      *setup*)    fmt="安装程序 (.exe)" ;;
+                      *portable*) fmt="便携版 (.exe)" ;;
+                      *)          fmt="可执行文件 (.exe)" ;;
+                    esac ;;
+                  *.dmg)
+                    case "$lower" in
+                      *arm64*) fmt="macOS 苹果芯片 (.dmg)" ;;
+                      *x64*)   fmt="macOS Intel (.dmg)" ;;
+                      *)       fmt="macOS (.dmg)" ;;
+                    esac ;;
+                  *.AppImage) fmt="Linux AppImage" ;;
+                  *.deb)      fmt="Linux .deb" ;;
+                  *.rpm)      fmt="Linux .rpm" ;;
+                  *) continue ;;
+                esac
+                url="$FILE_URL/$TAG/${name// /%20}"
+                printf '| %s | %s | [下载](%s) |\n' "$plat" "$fmt" "$url"
+              done
+            done
             echo
-            echo "### 完整变更记录(自动生成)"
+            echo "## 📝 更新内容"
             echo
             echo "$NOTES"
+            echo
+            [ -n "$COMPARE" ] && echo "$COMPARE"
           } > RELEASE_BODY.md
           echo "RESULT_TAG=$TAG" >> "$GITHUB_ENV"
 

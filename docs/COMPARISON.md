@@ -20,9 +20,9 @@
 | ---------------------- | :-------------------------: | :---------------------: | :---------------------: |
 | **框架**         |         Electron 43         |       Electron 28       |         Tauri 2         |
 | **前端**         |     纯原生 HTML/CSS/JS     |      React + Vite      |      React + Vite      |
-| **代码量**       |          ~3.5k 行          |         ~8k 行         |         ~15k 行         |
+| **代码量**       |          ~3.6k 行          |         ~8k 行         |         ~15k 行         |
 | **运行时捆绑**   |          ❌ 不捆绑          |       ✅ 捆绑 dsh       |        ❌ 不捆绑        |
-| **第三方依赖**   | 1 个 (`electron-menubar`) |          多个          |    多个 (Rust crate)    |
+| **第三方依赖**   | 1 个 (updater)           |          多个          |    多个 (Rust crate)    |
 | **托盘**         |        ✅ 类原生自绘        |       ✅ 系统托盘       |       ✅ 系统托盘       |
 | **全局快捷键**   |          ✅ 可录制          |           ✅           |           ✅           |
 | **开机自启**     |             ✅             |           ❌           |           ❌           |
@@ -31,8 +31,8 @@
 | **设置页**       |     ✅ 环境检测 + 日志     |           ❌           |         ✅ 基础         |
 | **安全隔离**     |         ✅ sandbox         |        ⚠️ 部分        |           ✅           |
 | **打包格式**     |       NSIS + Portable       |          NSIS          |       MSI + NSIS       |
-| **平台**         |           Windows           | Windows / macOS / Linux | Windows / macOS / Linux |
-| **自动更新**     |           ❌ 手动           |           ❌           |           ✅           |
+| **平台**         | Windows / macOS / Linux | Windows / macOS / Linux | Windows / macOS / Linux |
+| **自动更新**     |             ✅             |           ❌           |           ✅           |
 
 ---
 
@@ -84,12 +84,13 @@
 
 ## 本项目定位
 
-**DeepSeek Harness Desktop Simple** 的核心理念是 **「简介」**：
+**DeepSeek Harness Desktop Simple** 的核心理念是 **「简洁」**：
 
-- 代码量最小（~3.5k 行），零前端框架，纯原生实现
-- 仅 1 个第三方运行时依赖（`electron-menubar`）
-- 桌面体验完整：自定义标题栏拖拽、Acrylic 亚克力背景、类原生自绘托盘
-- 设置页功能齐全：环境检测 + 一键更新 + 日志管理 + 快捷键录制 + 开机自启
+- 代码量最小（~3.6k 行），零前端框架，纯原生实现
+- 仅 1 个第三方运行时依赖（`electron-updater`）
+- 桌面体验完整：自定义标题栏拖拽、Acrylic 亚克力背景、类原生托盘菜单、标题栏双击最大化
+- 设置覆盖层功能齐全：环境检测 + 一键更新 + 日志管理 + 快捷键录制 + 开机自启 + 自动更新
+- 跨平台构建：Windows / macOS / Linux（NSIS + Portable / dmg + zip / AppImage + deb + rpm）
 - 安全到位：`contextIsolation` + `sandbox` + 权限拒绝 + 导航限制
 
 **适合人群**：希望代码简洁、易于理解和修改的开发者；偏好「薄壳」理念、不愿捆绑运行时的用户。

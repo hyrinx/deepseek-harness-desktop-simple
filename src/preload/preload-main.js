@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('windowDrag', {
   }
 })
 
-// 设置覆盖层 API（原 preload-settings.js 的内容迁移至此）
+// 设置覆盖层 API
 contextBridge.exposeInMainWorld('settingsAPI', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setShortcut: (name, value) => ipcRenderer.invoke('settings:set-shortcut', name, value),

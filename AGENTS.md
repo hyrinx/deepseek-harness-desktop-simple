@@ -4,9 +4,9 @@
 
 DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-First 架构，零第三方框架。
 
-- **主进程**: Node.js 内置模块 + `electron-menubar`
+- **主进程**: Node.js 内置模块 + `electron-updater`（托盘为原生 Tray + BrowserWindow，零第三方依赖）
 - **前端**: 纯原生 HTML/CSS/JS
-- **运行时**: 调用系统 `dsh web` CLI，BrowserWindow 嵌入展示
+- **运行时**: 调用系统 `dsh web` CLI，BrowserWindow 嵌入展示 + 设置覆盖层注入
 
 ## 技术栈
 
@@ -23,14 +23,12 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 
 ```
 ├── main.js              # 入口（单实例锁 + app 事件 + 启动调度）
-├── settings.html        # 设置页面（保留作参考，运行时不再独立加载）
 ├── package.json         # 项目配置 + electron-builder 配置
 ├── config.json          # 运行时配置（开发模式）
 ├── assets/              # 图标等静态资源
 ├── src/
 │   ├── preload/
 │   │   ├── preload-main.js     # 主窗口 preload（含设置覆盖层 API）
-│   │   ├── preload-settings.js # 设置页 preload（保留作参考）
 │   │   └── preload-tray.js     # 托盘 preload
 │   ├── settings-overlay/
 │   │   ├── style.css              # 设置覆盖层样式
@@ -42,7 +40,7 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 │   ├── env.js           # 运行时模式 + 环境检测 + 插件安装
 │   ├── dsh-home.js      # DSH 路径解析
 │   ├── host.js          # dsh 子进程管理
-│   ├── windows.js       # 主窗口 + 设置覆盖层
+│   ├── windows.js       # 主窗口 + 设置覆盖层 + 标题栏双击
 │   ├── tray.js          # 托盘 + 托盘菜单
 │   ├── autostart.js     # 开机自启
 │   ├── ipc.js           # IPC 处理器 + 全局快捷键 + 窗口拖拽
@@ -74,6 +72,8 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - 设置向导：`setup:mark-done`
 - 设置覆盖层：`settings:show-overlay`, `settings:hide-overlay`
 - 窗口拖拽：通过 `window-drag-start/move/end` 事件实现
+- 标题栏双击：通过 `window-toggle-maximize` 实现最大化/还原
+- 自动更新：委托 `updater.js` 的 `registerUpdaterHandlers`
 
 ### src/lifecycle.js
 - 启动入口 `bootstrap()`：创建主窗口 → 启动 host → 创建托盘 → 导航
@@ -88,7 +88,7 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - 更新状态管理：`idle → checking → available/no-update → downloading → downloaded → error`
 - 更新状态通过 IPC 暴露给渲染进程，设置覆盖层"关于"标签页展示更新 UI
 
-### src/settings-overlay.js
+### src/settings-overlay/
 - 设置覆盖层注入脚本，通过 `executeJavaScript` 注入到主窗口渲染进程
 - 包含完整的设置页 CSS/HTML/JS（自包含，零外部依赖）
 - 覆盖层浮在 dsh 网页上方，Esc / 点击遮罩 / 关闭按钮均可关闭
@@ -103,6 +103,16 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 6. 配置存储使用 `store.get/set` 方法
 7. IPC 通信使用 `ipcMain.handle` + `ipcRenderer.invoke` 模式
 8. preload 通过 `contextBridge.exposeInMainWorld` 暴露 API
+9. 每完成一项改动后，在根目录下生成 `COMMITS.md` 文件，将本次改动的 git 提交信息追加到该文件中，按时间倒序排列，由用户手动提交。格式如下：
+
+   ```
+   ## 2026-08-26 14:30:00
+
+   feat: 添加了 xxx 功能
+
+   - 详细说明改动内容
+   - 详细说明改动原因
+   ```
 
 ## 安全注意事项
 

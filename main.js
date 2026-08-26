@@ -14,7 +14,7 @@
 //   src/ipc.js        — IPC 处理器 + 全局快捷键 + 窗口拖拽
 //   src/lifecycle.js  — 生命周期（destroyUI / 退出 / 重启 / 启动）
 //   src/settings-overlay/  — 设置覆盖层（CSS/HTML/JS，注入到主窗口渲染进程）
-//   src/preload/      — preload 脚本（preload-tray.js / preload-main.js / preload-settings.js）
+//   src/preload/      — preload 脚本（preload-tray.js / preload-main.js）
 //   main.js           — 入口（本文件：单实例锁 + app 事件 + 启动调度）
 // ═══════════════════════════════════════════════════════════════
 
