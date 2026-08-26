@@ -5,9 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:win": "set NODE_OPTIONS=--use-system-ca && electron-builder --win",
-    "build:linux": "set NODE_OPTIONS=--use-system-ca && electron-builder --linux",
-    "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac"
+    "build:win": "set NODE_OPTIONS=--use-system-ca && electron-builder --win --publish never",
+    "build:linux": "set NODE_OPTIONS=--use-system-ca && electron-builder --linux --publish never",
+    "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac --publish never"
   },
   "build": {
     "appId": "com.hyrinx.deepseek-harness-desktop-simple",
@@ -51,6 +51,9 @@
       "installerHeaderIcon": "assets/app.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "${productName}.${ext}"
     },
     "linux": {
       "target": [

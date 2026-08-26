@@ -1,46 +1,33 @@
 # COMMITS
 
+## 2026-08-26 22:40:00
+
+chore: 便携版产物去除文件名版本号
+
+- [package.json](../package.json) 的 `portable` 目标新增 `artifactName: "${productName}.${ext}"`，文件名由 `DeepSeek Harness Desktop Simple 1.4.0.exe` 改为 `DeepSeek Harness Desktop Simple.exe`
+- 开机自启经 `realExePath()` 取 `PORTABLE_EXECUTABLE_FILE` 真实文件名，与版本号无关，去除版本号不影响该逻辑
+- 发布流程按 GitHub 真实资产名生成下载表，文件名变化自动适配，无需改动
+
 ## 2026-08-26 22:30:00
 
-chore: 清理 autostart.js 调试日志，精简说明
+fix: 修复开机自启全链路(写入删除纯 Electron API + 显式 name 删除 + 失败兜底 + 测试)
 
-- 移除 [src/autostart.js](../src/autostart.js) `applyAutoStart` 中诊断用的 `autostart.apply` 日志（完整打印 `getLoginItemSettings` 对照注册表），该调试目的已完成
-- 精简文件头注释为必要信息：写入/删除走纯 Electron API，读取因 Electron「路径含空格读回恒 false」（#31710 官方不修复）故用 `reg query` 校验，便携版传真实双击路径
-- 保留失败兜底逻辑与失败日志，语法校验通过
+### 根因
+- `app.getLoginItemSettings()` 读回不可靠：Windows 上读回 `openAtLogin` 恒为 false——既要求传入的 `path`/`args` 与 `setLoginItemSettings` 完全一致，又存在「路径含空格读回失效」的 Electron 缺陷（#31710，官方不修复），无法作为真实自启状态的判定依据
+- `app.setAppUserModelId` 会改变 `setLoginItemSettings` 写入注册表的默认键名，读写键名不一致进一步加剧读回 false
+- 关闭开机自启失效：Windows 上 `app.setLoginItemSettings({ openAtLogin: false })` 只有显式传入 `name` 才会删除对应的 Run 注册表值，不传 `name` 时删除静默失效、条目残留 → 表现为「点击关闭后重启仍自启」
 
-## 2026-08-26 22:10:00
+### 修复(src/autostart.js)
+- `loginOptions()` 统一 `name: app.name + path + args`，读写共用同一份参数：开启写入与关闭删除指向同一值名，关闭可正确删除 Run 值
+- 写入/删除改用纯 Electron API `app.setLoginItemSettings`；便携版经 `realExePath()` 传真实双击路径，避免默认写入 %TEMP% 临时目录
+- 读取仍用 `reg query` 整键校验真实状态（唯一能反映实际自启的手段，因纯 API 读回不可靠）
+- 失败兜底：`actuallySet` 与请求不一致时强制清除自启项，避免注册表残留「表面开启实则无效」条目，消除 UI 与实际状态不符
+- 移除调试用的 `autostart.apply` 诊断日志，文件头注释精简为必要信息
 
-test: 新增开机自启纯 Electron API 测试(验证无需直接操作注册表)
-
-- 新增 [tests/autostart-pure-api.test.js](../tests/autostart-pure-api.test.js)，用隔离值名 + 外部 path 验证 `app.setLoginItemSettings` 的开启/删除：注册表仅作为断言事实源，生产逻辑不直接改注册表
-- 测试结论(5 项全过)：纯 Electron API 可完成自启写入与删除；但关闭时**必须显式传 `name`**，省略 name 会静默失效（阶段 3 已复现）；`getLoginItemSettings` 读回在非默认 execPath 下恒为 false，不可作为判定依据
-- 运行：`node_modules\.bin\electron.cmd tests\autostart-pure-api.test.js`，退出码 0 全过
-
-## 2026-08-26 21:55:00
-
-fix: 修复关闭开机自启失效（Electron 删除 Run 值需显式传 name）
-
-- 根因：Windows 上 `app.setLoginItemSettings({ openAtLogin: false })` 只有显式传入 `name` 时才会删除对应的 Run 注册表值；不传 `name` 时删除会静默失效，注册表条目残留，表现为「点击关闭后重启仍自启」。用隔离的 Electron 测试脚本实证复现并定位：开启时不传 name 正常写入 `app.name`（如 `dukestest`），关闭时不传 name 条目仍在，显式传 `name` 后条目被删除
-- 修复：[src/autostart.js](../src/autostart.js) 的 `loginOptions()` 在 Windows 分支显式补 `name: app.name`，使开启写入与关闭删除统一指向同一值名（真实值名即 `deepseek-harness-desktop-simple`）；`path` 仍用真实双击路径、`args` 仍用 `--silence`
-- 读取仍以 `reg query` 整键验证为准（`getLoginItemSettings` 在本环境读回 `openAtLogin` 恒为 false，不可靠）
-
-## 2026-08-26 20:35:00
-
-fix: 开机自启改用纯 Electron API(移除 reg query,修复读回 openAtLogin 为 false)
-
-- 根因：`app.getLoginItemSettings()` 在 Windows 上要求传入的 `path`/`args` 与 `setLoginItemSettings()` 完全一致，否则 `openAtLogin` 恒为 `false`——之前安装版/便携版读回 false 正是读写比对参数不一致导致，而非注册表写入失败
-- 修复：[src/autostart.js](../src/autostart.js) 新增 `loginOptions()`，读写共用同一份 `{ path: realExePath() || process.execPath, args: ['--silence'] }`；删除 `execSync` / `reg query`，不再直查注册表
-- 便携版经 `realExePath()` 传真实双击路径，避免 Electron 默认用临时解压目录路径比对失败；macOS 不传参（`path`/`args` 仅 Windows 有效，móu平台行为保持不变）
-
-## 2026-08-26 19:30:00
-
-fix: 修复开机自启开启失败的问题
-
-- 根因 1：`app.setAppUserModelId` 会改变 `setLoginItemSettings` 写入注册表的默认键名，但 `getLoginItemSettings` 仍用 `app.name` 读取，导致读写键名不一致，`openAtLogin` 始终为 `false`
-- 根因 2：`setLoginItemSettings` 显式传入 `path: app.getPath('exe')` 后，`getLoginItemSettings` 内部用 `process.execPath` 与注册表值做比对，Windows 上路径大小写/短路径等边缘情况会导致字符串不相等，比对失败
-- 修复底层：[src/autostart.js](../src/autostart.js) 两处——`setLoginItemSettings` 和 `getLoginItemSettings` 均显式传入 `name: app.name`，确保读写同一键名；删除 `path` 参数，让 Electron 默认使用 `process.execPath`，读写使用同一默认值
-- 修复 UI：[src/settings-overlay/settings-overlay.js](../src/settings-overlay/settings-overlay.js) `commit` 改为乐观更新，用 `res.actuallySet !== nextEnabled` 检测底层是否静默失败
-- 自启参数 `AUTOSTART_ARG` 由 `--from-autostart` 改为 `--silence`（[src/constants.js](../src/constants.js)）
+### 配套
+- `src/constants.js`：自启参数 `--from-autostart` → `--silence`
+- `src/settings-overlay/settings-overlay.js`：`commit` 改乐观更新，用 `actuallySet` 检测底层静默失败并提示
+- 新增 `tests/autostart-pure-api.test.js`：验证纯 Electron API 下开启/关闭对注册表的真实写入与删除（退出码 0 全过）；关闭必须显式传 `name`，省略会静默失效
 
 ## 2026-08-26 19:06:10
 
