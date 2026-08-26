@@ -1,0 +1,170 @@
+<!-- ════════════════════════════════════════════════
+  设置覆盖层 HTML 结构（注入到主窗口 #dsh-so 容器内）
+  ════════════════════════════════════════════════ -->
+<div id="dsh-so-backdrop"></div>
+<div id="dsh-so-panel">
+  <button id="dsh-so-close" title="关闭">&times;</button>
+  <div class="page">
+    <div class="header">
+      <div class="header-logo">DS</div>
+      <span class="header-title">DeepSeek Harness</span>
+      <span class="header-sub">设置</span>
+    </div>
+    <div class="tabs" id="dsh-so-tabNav">
+      <button class="tab-btn active" data-tab="env">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line>
+        </svg>
+        环境
+      </button>
+      <button class="tab-btn" data-tab="general">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        常规
+      </button>
+      <button class="tab-btn" data-tab="about">
+        <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        关于
+      </button>
+    </div>
+    <div class="tab-content">
+      <!-- 环境标签页 -->
+      <div class="tab-panel active" id="dsh-so-tab-env">
+        <div class="setup-banner" id="dsh-so-setupBanner">
+          <span class="banner-icon">🛠️</span>
+          <span class="banner-text">首次使用前请检查系统环境。<strong>Node.js</strong> 和 <strong>dsh</strong> 是运行 DeepSeek Harness 的必要条件。</span>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>系统环境检查</div>
+          <div class="card-body">
+            <div class="env-row">
+              <div class="env-icon" style="background:linear-gradient(135deg,#539e43 0%,#6cc24a 100%);">N</div>
+              <div class="env-info">
+                <div class="env-name">Node.js 运行时</div>
+                <div class="env-status" id="dsh-so-nodeStatus"><span class="status-dot loading"></span> 检测中...</div>
+              </div>
+              <span class="env-version loading" id="dsh-so-nodeVersion">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm" id="dsh-so-nodeRefreshBtn" disabled title="重新检测">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="env-row">
+              <div class="env-icon" style="background:linear-gradient(135deg,#cb3837 0%,#e53e3e 100%);">n</div>
+              <div class="env-info">
+                <div class="env-name">npm 包管理器</div>
+                <div class="env-status" id="dsh-so-npmStatus"><span class="status-dot loading"></span> 检测中...</div>
+              </div>
+              <span class="env-version loading" id="dsh-so-npmVersion">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm btn-primary" id="dsh-so-npmUpdateBtn" disabled title="更新到最新版">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  更新
+                </button>
+              </div>
+            </div>
+            <div class="env-row">
+              <div class="env-icon" style="background:linear-gradient(135deg,#1677ff 0%,#4dabf7 100%);">D</div>
+              <div class="env-info">
+                <div class="env-name">DeepSeek Harness CLI</div>
+                <div class="env-status" id="dsh-so-dshStatus"><span class="status-dot loading"></span> 检测中...</div>
+              </div>
+              <span class="env-version loading" id="dsh-so-dshVersion">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm btn-primary" id="dsh-so-dshUpdateBtn" disabled title="更新到最新版">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  更新
+                </button>
+              </div>
+            </div>
+            <div class="env-row">
+              <div class="env-icon" style="background:linear-gradient(135deg,#8b5cf6 0%,#a78bfa 100%);">P</div>
+              <div class="env-info">
+                <div class="env-name">dshmarket 插件</div>
+                <div class="env-status" id="dsh-so-dshPluginStatus"><span class="status-dot loading"></span> 检测中...</div>
+              </div>
+              <span class="env-version loading" id="dsh-so-dshPluginVersion">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm btn-primary" id="dsh-so-dshPluginBtn" disabled title="安装 dshmarket 插件">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                  安装插件市场
+                </button>
+              </div>
+            </div>
+            <div class="update-log" id="dsh-so-updateLog"></div>
+          </div>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div class="card-body">
+            <button class="btn btn-primary" id="dsh-so-checkAllBtn" disabled>
+              <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+              重新检测全部
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- 常规标签页 -->
+      <div class="tab-panel" id="dsh-so-tab-general">
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>启动行为</div>
+          <div class="card-body">
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-name">开机自动启动</div>
+                <div class="setting-desc" id="dsh-so-autostartDesc">登录 Windows 时自动启动（仅打包 .exe 后可用）</div>
+              </div>
+              <div class="setting-control">
+                <label class="switch">
+                  <input type="checkbox" id="dsh-so-autostartInput" aria-label="开机自动启动开关">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>快捷键</div>
+          <div class="card-body">
+            <div class="shortcut-row">
+              <div class="shortcut-info">
+                <div class="shortcut-name">切换窗口显示 / 隐藏</div>
+                <div class="shortcut-desc">全局快捷键，在任何应用中都有效</div>
+              </div>
+              <div class="shortcut-actions">
+                <div class="recorder" id="dsh-so-shortcutRecorder">
+                  <span class="recorder-sizer" id="dsh-so-recorderSizer" aria-hidden></span>
+                  <input class="recorder-input" id="dsh-so-recorderInput" readonly>
+                  <span class="recorder-label" id="dsh-so-recorderLabel">点击录制快捷键</span>
+                </div>
+                <button class="btn btn-sm" id="dsh-so-resetBtn" title="恢复默认">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                  重置
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 关于标签页 -->
+      <div class="tab-panel" id="dsh-so-tab-about">
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>关于</div>
+          <div class="card-body">
+            <ul class="about-list">
+              <li><span class="about-label">应用名称</span><span class="about-value">DeepSeek Harness Simple</span></li>
+              <li><span class="about-label">版本</span><span class="about-value"><code id="dsh-so-appVersion">0.1.0</code></span></li>
+              <li><span class="about-label">平台</span><span class="about-value"><code id="dsh-so-appPlatform">-</code></span></li>
+              <li><span class="about-label">说明</span><span class="about-value">DeepSeek 轻量桌面包装，基于 Electron</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="dsh-so-toast"></div>

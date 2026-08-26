@@ -179,11 +179,23 @@ async function navigateMainWindow() {
 }
 
 // ── 设置覆盖层（注入到主窗口，浮在 dsh 网页上方） ──
+// 读取三个独立文件：CSS、HTML、JS 逻辑，注入时拼接。
+// JS 中使用 __DSH_SETTINGS_CSS__ / __DSH_SETTINGS_HTML__ 占位符，
+// 注入前替换为实际文件内容。
 
 const fs = require('node:fs')
-const SETTINGS_OVERLAY_SCRIPT = fs.readFileSync(
-  join(__dirname, 'settings-overlay.js'), 'utf-8'
-)
+let _overlayScript = null
+function getOverlayScript() {
+  if (_overlayScript) return _overlayScript
+  const dir = __dirname
+  const css = JSON.stringify(fs.readFileSync(join(dir, 'settings-overlay', 'style.css'), 'utf-8'))
+  const html = JSON.stringify(fs.readFileSync(join(dir, 'settings-overlay', 'settings-overlay.html'), 'utf-8'))
+  const js = fs.readFileSync(join(dir, 'settings-overlay', 'settings-overlay.js'), 'utf-8')
+  _overlayScript = js
+    .replace('__DSH_SETTINGS_CSS__', css)
+    .replace('__DSH_SETTINGS_HTML__', html)
+  return _overlayScript
+}
 
 function showSettingsOverlay() {
   const win = state.mainWindow
@@ -197,7 +209,7 @@ function showSettingsOverlay() {
     if (window.${injectedKey}) {
       if (window.__dshShowSettingsOverlay) window.__dshShowSettingsOverlay()
     } else {
-      ${SETTINGS_OVERLAY_SCRIPT}
+      ${getOverlayScript()}
       if (window.__dshShowSettingsOverlay) window.__dshShowSettingsOverlay()
     }
   })()`).catch((err) => {
