@@ -7,6 +7,7 @@ out/
 release/
 
 # ── 运行产物 ─────────────────────────────────────────────
+COMMITS.md
 *.log
 config.json
 npm-debug.log*

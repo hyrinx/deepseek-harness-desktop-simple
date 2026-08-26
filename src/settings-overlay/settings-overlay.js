@@ -371,12 +371,17 @@
       commit: function (nextEnabled) {
         if (state.autostart.busy) return
         if (!state.autostart.available) { Toast.info('打包为 .exe 后可使用此功能'); this.render(); return }
-        const prev = state.autostart.enabled
         state.autostart.enabled = nextEnabled; state.autostart.busy = true; this.render()
         return IPC.setAutoStart(nextEnabled).then(function (res) {
           state.autostart.busy = false
-          if (!res) { state.autostart.enabled = prev; AutoStart.render(); return }
-          state.autostart.enabled = Boolean(res.enabled); state.autostart.actuallySet = Boolean(res.actuallySet)
+          if (!res) { state.autostart.enabled = !nextEnabled; AutoStart.render(); Toast.error('设置失败'); return }
+          state.autostart.actuallySet = Boolean(res.actuallySet)
+          if (Boolean(res.actuallySet) !== nextEnabled) {
+            state.autostart.enabled = !nextEnabled
+            AutoStart.render()
+            Toast.error(nextEnabled ? '开启开机自启失败，请检查系统权限' : '关闭开机自启失败')
+            return
+          }
           AutoStart.render()
           Toast.success(nextEnabled ? '已开启开机自启' : '已关闭开机自启')
         })

@@ -22,7 +22,7 @@ const IS_WIN = process.platform === 'win32'
 const IS_MAC = process.platform === 'darwin'
 const IS_LINUX = process.platform === 'linux'
 
-const AUTOSTART_ARG = '--from-autostart'
+const AUTOSTART_ARG = '--silence'
 
 // 开发模式数据根目录：项目根目录（process.cwd()）
 // 打包后：exe 所在目录（便携版用 PORTABLE_EXECUTABLE_DIR）
