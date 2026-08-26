@@ -71,8 +71,7 @@ jobs:
       - name: 列出产物
         run: ls -R dist/
 
-      - name: 生成发布说明(自动下载表 + 自动更新记录)
-        id: notes
+      - name: 生成发布说明(更新内容)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -80,16 +79,16 @@ jobs:
           TAG="${{ inputs.tag_name || github.ref_name }}"
           # 上一版本 tag(完整历史由 checkout 的 fetch-depth: 0 提供),用于生成分类更新记录
           PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
-          FILE_URL="https://github.com/${{ github.repository }}/releases/download"
 
-          # 依 conventional commit 前缀,把自上一版本以来的提交归类到各分类区块
+          # 依 conventional commit 前缀,把自上一版本以来的提交归类到各分类区块;
+          # 标题已体现分类,归类时去掉 "feat:/fix:..." 等前缀
           FEAT=(); FIX=(); OPT=(); OTH=()
           if [ -n "$PREV" ]; then
             while IFS= read -r subj; do
               case "$subj" in
-                feat:*)                       FEAT+=("$subj") ;;
-                fix:*)                        FIX+=("$subj") ;;
-                refactor:*|perf:*|style:*|docs:*|chore:*|ci:*|test:*|build:*|release:*) OPT+=("$subj") ;;
+                feat:*)                       FEAT+=("${subj#*: }") ;;
+                fix:*)                        FIX+=("${subj#*: }") ;;
+                refactor:*|perf:*|style:*|docs:*|chore:*|ci:*|test:*|build:*|release:*) OPT+=("${subj#*: }") ;;
                 *)                            OTH+=("$subj") ;;
               esac
             done < <(git log --pretty=format:%s "$PREV..$TAG")
@@ -106,56 +105,19 @@ jobs:
           rm -f "$NOTES_FILE"
           [ -z "$NOTES" ] && NOTES="此版本暂无变更记录"
 
-          # 依据实际产物文件自动生成下载表(跳过 zip/blockmap/yml 等非安装包)
+          # 先仅写更新内容;安装包下载表待 Release 创建并上传资产后,
+          # 按 GitHub 真实托管的资产名生成(避免空格被转点号导致下载链接 404)
           {
-            echo "## 📦 安装包"
-            echo
-            echo "| 平台 | 格式 | 关联 |"
-            echo "| --- | --- | --- |"
-            for dir in windows macos linux; do
-              [ -d "dist/$dir" ] || continue
-              case "$dir" in
-                windows) plat="🪟 Windows" ;;
-                macos)   plat="🍎 macOS" ;;
-                linux)   plat="🐧 Linux" ;;
-              esac
-              for f in "dist/$dir"/*; do
-                [ -f "$f" ] || continue
-                name="$(basename "$f")"
-                lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
-                case "$f" in
-                  *.exe)
-                    case "$lower" in
-                      *setup*)    fmt="安装程序 (.exe)" ;;
-                      *portable*) fmt="便携版 (.exe)" ;;
-                      *)          fmt="可执行文件 (.exe)" ;;
-                    esac ;;
-                  *.dmg)
-                    case "$lower" in
-                      *arm64*) fmt="macOS 苹果芯片 (.dmg)" ;;
-                      *x64*)   fmt="macOS Intel (.dmg)" ;;
-                      *)       fmt="macOS (.dmg)" ;;
-                    esac ;;
-                  *.AppImage) fmt="Linux AppImage" ;;
-                  *.deb)      fmt="Linux .deb" ;;
-                  *.rpm)      fmt="Linux .rpm" ;;
-                  *) continue ;;
-                esac
-                url="$FILE_URL/$TAG/${name// /%20}"
-                printf '| %s | %s | [下载](%s) |\n' "$plat" "$fmt" "$url"
-              done
-            done
-            echo
             echo "## 📝 更新内容"
             echo
             echo "$NOTES"
-          } > RELEASE_BODY.md
+          } > NOTES.md
           echo "RESULT_TAG=$TAG" >> "$GITHUB_ENV"
 
-      - name: 发布到 GitHub Release
+      - name: 发布到 GitHub Release (草稿)
         uses: softprops/action-gh-release@v2
         with:
-          # 只发布安装包产物,避免把 Electron 内部框架文件(locale.pak/dll/…)也传上去
+          # 只上传安装包产物,避免把 Electron 内部框架文件(locale.pak/dll/…)也传上去
           # 参考 upload-artifact 的子目录结构: dist/<平台>/<安装包>
           files: |
             dist/*/*.exe
@@ -166,6 +128,62 @@ jobs:
             dist/*/*.zip
             dist/*/*.blockmap
             dist/*/latest*.yml
-          body_path: RELEASE_BODY.md
+          body_path: NOTES.md
           tag_name: ${{ env.RESULT_TAG }}
           draft: true
+
+      - name: 生成安装包下载表(按真实资产)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          TAG="${{ env.RESULT_TAG }}"
+          # 读取 Release 实际托管的资产下载地址,保证下载链接与上传名完全一致
+          # (不直接用本地文件名拼 URL,可规避 GitHub 将文件名空格转点号导致的 404)
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | [.name,.browser_download_url] | @tsv' > assets.tsv
+
+          WIN=(); MAC=(); LIN=()
+          while IFS=$'\t' read -r name url; do
+            lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+            case "$lower" in
+              *.exe)
+                case "$lower" in
+                  *setup*)    fmt="安装程序 (.exe)" ;;
+                  *)          fmt="可执行文件 (.exe)" ;;
+                esac
+                WIN+=("$fmt|$url") ;;
+              *.dmg)
+                case "$lower" in
+                  *arm64*) fmt="macOS 苹果芯片 (.dmg)" ;;
+                  *x64*)   fmt="macOS Intel (.dmg)" ;;
+                  *)       fmt="macOS (.dmg)" ;;
+                esac
+                MAC+=("$fmt|$url") ;;
+              *.appimage) LIN+=("Linux AppImage|$url") ;;
+              *.deb)      LIN+=("Linux .deb|$url") ;;
+              *.rpm)      LIN+=("Linux .rpm|$url") ;;
+            esac
+          done < assets.tsv
+
+          {
+            echo "## 📦 安装包"
+            echo
+            echo "| 平台 | 格式 | 关联 |"
+            echo "| --- | --- | --- |"
+            for row in "${WIN[@]}"; do printf '| 🪟 Windows | %s | [下载](%s) |\n' "${row%%|*}" "${row#*|}"; done
+            for row in "${MAC[@]}"; do printf '| 🍎 macOS | %s | [下载](%s) |\n' "${row%%|*}" "${row#*|}"; done
+            for row in "${LIN[@]}"; do printf '| 🐧 Linux | %s | [下载](%s) |\n' "${row%%|*}" "${row#*|}"; done
+          } > TABLE.md
+
+          # 合并更新内容 + 安装包下载表
+          {
+            cat NOTES.md
+            echo
+            cat TABLE.md
+          } > RELEASE_BODY.md
+
+      - name: 更新发布正文
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ env.RESULT_TAG }}" --notes-file RELEASE_BODY.md
