@@ -1,5 +1,12 @@
 # COMMITS
 
+## 2026-08-26 16:15:00
+
+fix: workflow_dispatch 时 release 检出 main 导致变更记录为空
+
+- 根因：release job 默认 checkout 在 `workflow_dispatch` 下取到 main 分支，`git describe HEAD^` 解析出的 PREV 与目标 TAG 相同，对比区间塌缩为空，分类变更记录因此缺失
+- 修复：[release.yml](../.github/workflows/release.yml) 的 release job checkout 显式指定 `ref: inputs.tag_name || github.ref`，确保检出目标 tag
+
 ## 2026-08-26 16:00:00
 
 feat: 发布正文改为按 conventional commit 分类生成(同 Ghost-Downloader-3)

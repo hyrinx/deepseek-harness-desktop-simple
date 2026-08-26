@@ -59,6 +59,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # 关键:显式检出目标 tag(wf_dispatch 下默认 ref 是 main,会导致 git log 对比区间塌缩成空)
+          ref: ${{ inputs.tag_name || github.ref }}
           # 需要完整历史与 tag：用于按“上一个 tag”区间自动生成发布说明
           fetch-depth: 0
 
