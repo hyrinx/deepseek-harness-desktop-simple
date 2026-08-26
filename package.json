@@ -23,6 +23,11 @@
     "directories": {
       "output": "dist"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "hyrinx",
+      "repo": "deepseek-harness-desktop-simple"
+    },
     "win": {
       "target": [
         {
@@ -81,11 +86,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "assets/app.icns",
@@ -100,6 +111,10 @@
       }
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hyrinx/deepseek-harness-desktop-simple"
+  },
   "author": "Hyrinx",
   "license": "MIT",
   "devDependencies": {
@@ -108,5 +123,7 @@
     "electron-builder": "^26.15.7",
     "sharp": "^0.35.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
 }

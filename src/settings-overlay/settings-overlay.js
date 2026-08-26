@@ -144,6 +144,15 @@
       checkPlugin: function () { try { return window.envAPI.checkPlugin() } catch (e) { return { installed: false, version: '', error: String(e) } } },
       updatePlugin: function () { try { return window.envAPI.updatePlugin() } catch (e) { return { ok: false, error: String(e), output: '', beforeVer: '', afterVer: '' } } },
       setupMarkDone: function () { try { return window.setupAPI.markDone() } catch (e) { return false } },
+      updateCheck: function () { try { return window.updateAPI.check() } catch (e) { return { status: 'error', error: String(e) } } },
+      updateDownload: function () { try { return window.updateAPI.download() } catch (e) { return { status: 'error', error: String(e) } } },
+      updateInstall: function () { try { return window.updateAPI.install() } catch (e) { return false } },
+      updateGetState: function () { try { return window.updateAPI.getState() } catch (e) { return { status: 'error', error: String(e) } } },
+      updateGetMirror: function () { try { return window.updateAPI.getMirror() } catch (e) { return '' } },
+      updateSetMirror: function (mirror) { try { return window.updateAPI.setMirror(mirror) } catch (e) { return false } },
+      updateGetAutoCheck: function () { try { return window.updateAPI.getAutoCheck() } catch (e) { return true } },
+      updateSetAutoCheck: function (enabled) { try { return window.updateAPI.setAutoCheck(enabled) } catch (e) { return false } },
+      updateGetSkippedVersion: function () { try { return window.updateAPI.getSkippedVersion() } catch (e) { return '' } },
     }
 
     // ── DOM 引用 ──
@@ -158,6 +167,17 @@
         checkAll: qs('checkAllBtn'), updateLog: qs('updateLog'),
       },
       setupBanner: qs('setupBanner'),
+    }
+
+    // ── 更新 UI DOM ──
+    DOM.update = {
+      checkBtn: qs('updateCheckBtn'), downloadBtn: qs('updateDownloadBtn'), installBtn: qs('updateInstallBtn'),
+      statusText: qs('updateStatusText'), statusDot: qs('updateStatus').querySelector('.status-dot'),
+      progress: qs('updateProgress'), fill: qs('updateFill'), progressText: qs('updateProgressText'),
+      checkTime: qs('updateCheckTime'),
+      mirrorInput: qs('updateMirrorInput'), mirrorSaveBtn: qs('updateMirrorSaveBtn'),
+      autoCheckInput: qs('updateAutoCheckInput'), autoCheckDesc: qs('updateAutoCheckDesc'),
+      skippedVersion: qs('updateSkippedVersion'),
     }
 
     // ── 状态 ──
@@ -363,6 +383,136 @@
       },
     }
 
+    // ── 自动更新模块 ──
+    const Update = {
+      render: function (st) {
+        st = st || { status: 'idle', version: null, error: null, progress: 0, checkTime: null }
+        const dot = DOM.update.statusDot
+        const text = DOM.update.statusText
+        const checkBtn = DOM.update.checkBtn
+        const downloadBtn = DOM.update.downloadBtn
+        const installBtn = DOM.update.installBtn
+        const progress = DOM.update.progress
+        const fill = DOM.update.fill
+        const progressText = DOM.update.progressText
+        const checkTime = DOM.update.checkTime
+
+        dot.className = 'status-dot'
+        checkBtn.disabled = false
+        downloadBtn.style.display = 'none'
+        installBtn.style.display = 'none'
+        progress.style.display = 'none'
+        checkTime.style.display = 'none'
+
+        switch (st.status) {
+          case 'checking':
+            dot.classList.add('loading')
+            text.textContent = '正在检查更新...'
+            checkBtn.disabled = true
+            break
+          case 'available':
+            dot.classList.add('ok')
+            text.textContent = '发现新版本 v' + st.version
+            downloadBtn.style.display = 'inline-flex'
+            break
+          case 'downloading':
+            dot.classList.add('loading')
+            text.textContent = '正在下载 v' + st.version + '...'
+            progress.style.display = 'flex'
+            fill.style.width = st.progress + '%'
+            progressText.textContent = st.progress + '%'
+            checkBtn.disabled = true
+            downloadBtn.style.display = 'none'
+            break
+          case 'downloaded':
+            dot.classList.add('ok')
+            text.textContent = 'v' + st.version + ' 下载完成，准备安装'
+            installBtn.style.display = 'inline-flex'
+            break
+          case 'no-update':
+            dot.classList.add('ok')
+            text.textContent = '已是最新版本' + (st.version ? ' (v' + st.version + ')' : '')
+            break
+          case 'error':
+            dot.classList.add('err')
+            text.textContent = '更新检查失败: ' + (st.error || '未知错误')
+            break
+          default:
+            dot.classList.add('loading')
+            text.textContent = '准备中...'
+            break
+        }
+
+        if (st.checkTime) {
+          checkTime.style.display = 'block'
+          checkTime.textContent = '上次检查: ' + new Date(st.checkTime).toLocaleString()
+        }
+      },
+      load: function () {
+        return IPC.updateGetState().then(function (st) { Update.render(st) })
+      },
+      check: function () {
+        Update.render({ status: 'checking' })
+        return IPC.updateCheck().then(function (st) {
+          Update.render(st)
+          if (st.status === 'available') { Toast.info('发现新版本 v' + st.version) }
+          else if (st.status === 'no-update') { Toast.success('已是最新版本') }
+          else if (st.status === 'error') { Toast.error('检查失败: ' + (st.error || '')) }
+        })
+      },
+      download: function () {
+        return IPC.updateDownload().then(function (st) {
+          Update.render(st)
+          if (st.status === 'downloaded') { Toast.success('下载完成，点击安装并重启') }
+          else if (st.status === 'error') { Toast.error('下载失败: ' + (st.error || '')) }
+        })
+      },
+      install: function () {
+        Toast.info('正在准备安装...')
+        IPC.updateInstall()
+      },
+      loadMirror: function () {
+        return IPC.updateGetMirror().then(function (m) {
+          DOM.update.mirrorInput.value = m || ''
+        })
+      },
+      saveMirror: function () {
+        const mirror = DOM.update.mirrorInput.value.trim()
+        DOM.update.mirrorSaveBtn.disabled = true
+        DOM.update.mirrorSaveBtn.textContent = '保存中...'
+        return IPC.updateSetMirror(mirror).then(function () {
+          Toast.success(mirror ? '镜像已保存' : '已清除镜像，恢复直连')
+          DOM.update.mirrorSaveBtn.disabled = false
+          DOM.update.mirrorSaveBtn.textContent = '保存'
+        })
+      },
+      loadAutoCheck: function () {
+        return IPC.updateGetAutoCheck().then(function (enabled) {
+          DOM.update.autoCheckInput.checked = enabled
+        }).then(function () {
+          return IPC.updateGetSkippedVersion()
+        }).then(function (skipped) {
+          if (skipped) {
+            DOM.update.skippedVersion.style.display = 'block'
+            DOM.update.skippedVersion.textContent = '已跳过版本 v' + skipped
+          } else {
+            DOM.update.skippedVersion.style.display = 'none'
+          }
+        })
+      },
+      toggleAutoCheck: function () {
+        const enabled = DOM.update.autoCheckInput.checked
+        IPC.updateSetAutoCheck(enabled).then(function () {
+          if (enabled) {
+            DOM.update.skippedVersion.style.display = 'none'
+            Toast.success('已开启自动检查更新')
+          } else {
+            Toast.info('已关闭自动检查更新')
+          }
+        })
+      },
+    }
+
     // ── 事件绑定 ──
     function bindEvents() {
       const tabBtns = overlay.querySelectorAll('.tab-btn')
@@ -409,13 +559,20 @@
       DOM.env.npmUpdate.addEventListener('click', function () { Env.updateNpm() })
       DOM.env.dshUpdate.addEventListener('click', function () { Env.updateDsh() })
       DOM.env.dshPluginBtn.addEventListener('click', function () { Env.updatePlugin() })
+
+      // 更新按钮
+      DOM.update.checkBtn.addEventListener('click', function () { Update.check() })
+      DOM.update.downloadBtn.addEventListener('click', function () { Update.download() })
+      DOM.update.installBtn.addEventListener('click', function () { Update.install() })
+      DOM.update.mirrorSaveBtn.addEventListener('click', function () { Update.saveMirror() })
+      DOM.update.autoCheckInput.addEventListener('change', function () { Update.toggleAutoCheck() })
     }
 
     qs('close').addEventListener('click', function () { window.__dshHideSettingsOverlay() })
     document.getElementById('dsh-so-backdrop').addEventListener('click', function () { window.__dshHideSettingsOverlay() })
     document.getElementById('dsh-so-panel').addEventListener('click', function (e) { e.stopPropagation() })
 
-    Promise.all([IPC.getSettings(), IPC.fillAboutInfo(), AutoStart.load(), Env.checkAll()]).then(function (r) {
+    Promise.all([IPC.getSettings(), IPC.fillAboutInfo(), AutoStart.load(), Env.checkAll(), Update.load(), Update.loadMirror(), Update.loadAutoCheck()]).then(function (r) {
       const settings = r[0]
       const saved = settings && settings.shortcuts && settings.shortcuts.toggleWindow
       if (saved !== undefined && saved !== null) { state.recorder.shortcut = saved; state.recorder.draft = saved }

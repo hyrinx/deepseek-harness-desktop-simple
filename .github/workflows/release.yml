@@ -95,6 +95,8 @@ jobs:
             dist/*/*.deb
             dist/*/*.rpm
             dist/*/*.zip
+            dist/*/*.blockmap
+            dist/*/latest*.yml
           body_path: RELEASE_BODY.md
           tag_name: ${{ env.RESULT_TAG }}
           draft: true

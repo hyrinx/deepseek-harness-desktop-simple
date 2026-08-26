@@ -262,6 +262,53 @@ async function bootstrap() {
 
   const totalTook = bootMark('bootstrap done')
   logEvent('bootstrap.done', { tookMs: totalTook, uptimeSec: Math.round(process.uptime() * 1000) / 1000 })
+
+  // 自动更新：安装更新器 + 延迟检查更新（避免阻塞启动）
+  try {
+    const { setupUpdater, checkForUpdates, downloadUpdate, quitAndInstall, onStartupUpdateAvailable } = require('./updater')
+    setupUpdater()
+
+    // 启动时发现新版本 → 弹窗询问用户
+    onStartupUpdateAvailable((version) => {
+      const { dialog } = require('electron')
+      dialog.showMessageBox({
+        type: 'info',
+        title: '发现新版本',
+        message: `发现新版本 v${version}`,
+        detail: '下载完成后可在设置页「关于」标签中安装。',
+        buttons: ['立即下载', '跳过此版本', '不再提醒'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then(({ response }) => {
+        if (response === 0) {
+          downloadUpdate().catch((err) => {
+            logEvent('updater.startup-download.fail', { err: err.message }, 'warn')
+          })
+        } else if (response === 1) {
+          // 跳过此版本：记录版本号，下次不同版本再提醒
+          store.set('update.skippedVersion', version)
+          logEvent('updater.skip-version', { version })
+        } else if (response === 2) {
+          // 不再提醒：关闭自动检查
+          store.set('update.autoCheck', false)
+          logEvent('updater.disable-auto-check')
+        }
+      })
+    })
+
+    // 仅当 autoCheck 为 true 时才自动检查
+    if (store.get('update.autoCheck') !== false) {
+      setTimeout(() => {
+        checkForUpdates().catch((err) => {
+          logEvent('updater.startup-check.fail', { err: err.message }, 'warn')
+        })
+      }, 5000)
+    } else {
+      logEvent('updater.auto-check.disabled')
+    }
+  } catch (err) {
+    logEvent('updater.setup.fail', { err: err.message }, 'warn')
+  }
 }
 
 module.exports = {

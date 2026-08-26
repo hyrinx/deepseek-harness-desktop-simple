@@ -46,6 +46,7 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 │   ├── tray.js          # 托盘 + 托盘菜单
 │   ├── autostart.js     # 开机自启
 │   ├── ipc.js           # IPC 处理器 + 全局快捷键 + 窗口拖拽
+│   ├── updater.js       # 自动更新（安装版 electron-updater + 便携版手动下载）
 │   └── lifecycle.js     # 生命周期管理
 └── dist/                # 构建输出
 ```
@@ -78,6 +79,14 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - 启动入口 `bootstrap()`：创建主窗口 → 启动 host → 创建托盘 → 导航
 - 首次启动：自动弹出设置覆盖层（注入到主窗口），引导用户检查系统环境
 - 退出/重启：`destroyUI` + `shutdownHost` + `app.quit/relaunch`
+- 启动时自动初始化更新器，延迟 5 秒检查更新
+
+### src/updater.js
+- 自动更新模块，支持安装版和便携版两种更新方式
+- **安装版（NSIS）**：使用 `electron-updater` 自动检查、下载、静默安装
+- **便携版**：通过 GitHub API 获取最新 release 信息，手动下载 .exe 并创建替换脚本
+- 更新状态管理：`idle → checking → available/no-update → downloading → downloaded → error`
+- 更新状态通过 IPC 暴露给渲染进程，设置覆盖层"关于"标签页展示更新 UI
 
 ### src/settings-overlay.js
 - 设置覆盖层注入脚本，通过 `executeJavaScript` 注入到主窗口渲染进程

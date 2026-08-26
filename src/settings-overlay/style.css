@@ -266,3 +266,29 @@
 @keyframes dsh-so-spin       { to { transform: rotate(360deg); } }
 @keyframes dsh-so-pulse      { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 @keyframes dsh-so-pulse-text { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+
+/* ── 自动更新区域 ── */
+#dsh-so .update-section {
+  display: flex; flex-direction: column; gap: 10px;
+}
+#dsh-so .update-status {
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--gray-800);
+}
+#dsh-so .update-progress {
+  display: flex; align-items: center; gap: 10px;
+}
+#dsh-so .update-progress-bar {
+  flex: 1; height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden;
+}
+#dsh-so .update-progress-fill {
+  height: 100%; background: var(--blue); border-radius: 3px; transition: width var(--transition);
+}
+#dsh-so .update-progress-text {
+  font-size: 11.5px; color: var(--gray-700); flex-shrink: 0; min-width: 32px; text-align: right;
+}
+#dsh-so .update-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+#dsh-so .update-check-time {
+  font-size: 11px; color: var(--gray-600); margin-top: 2px;
+}

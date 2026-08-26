@@ -163,6 +163,63 @@
             </ul>
           </div>
         </div>
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>软件更新</div>
+          <div class="card-body">
+            <div class="update-section" id="dsh-so-updateSection">
+              <div class="update-status" id="dsh-so-updateStatus">
+                <span class="status-dot loading"></span>
+                <span id="dsh-so-updateStatusText">准备中...</span>
+              </div>
+              <div class="update-progress" id="dsh-so-updateProgress" style="display:none;">
+                <div class="update-progress-bar">
+                  <div class="update-progress-fill" id="dsh-so-updateFill" style="width:0%;"></div>
+                </div>
+                <span class="update-progress-text" id="dsh-so-updateProgressText">0%</span>
+              </div>
+              <div class="update-actions">
+                <button class="btn btn-sm" id="dsh-so-updateCheckBtn">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  检查更新
+                </button>
+                <button class="btn btn-sm btn-primary" id="dsh-so-updateDownloadBtn" style="display:none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  下载更新
+                </button>
+                <button class="btn btn-sm btn-primary" id="dsh-so-updateInstallBtn" style="display:none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  安装并重启
+                </button>
+              </div>
+              <div class="update-check-time" id="dsh-so-updateCheckTime" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>更新设置</div>
+          <div class="card-body">
+            <label class="switch-row" style="margin-bottom:6px;">
+              <span class="switch-label">启动时自动检查更新</span>
+              <div class="switch">
+                <input type="checkbox" id="dsh-so-updateAutoCheckInput" checked />
+                <span class="switch-slider"></span>
+              </div>
+            </label>
+            <p class="card-desc" id="dsh-so-updateAutoCheckDesc">开启后，启动时自动检查并弹窗提示新版本</p>
+            <p class="card-desc" id="dsh-so-updateSkippedVersion" style="display:none;color:var(--orange);"></p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>更新镜像</div>
+          <div class="card-body">
+            <p class="card-desc" style="margin-bottom:8px;">如果你无法直接访问 GitHub，可设置加速镜像。留空则直连 GitHub。</p>
+            <div style="display:flex;gap:8px;">
+              <input type="text" class="input" id="dsh-so-updateMirrorInput" placeholder="例如：https://ghproxy.com/" style="flex:1;font-size:12px;" />
+              <button class="btn btn-sm" id="dsh-so-updateMirrorSaveBtn">保存</button>
+            </div>
+            <p class="card-desc" style="margin-top:6px;font-size:11px;color:var(--gray-600);">常用镜像：<code>https://ghproxy.com/</code> 或 <code>https://gh.api.99988866.xyz/</code></p>
+          </div>
+        </div>
       </div>
     </div>
   </div>

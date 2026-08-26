@@ -213,6 +213,53 @@ function registerIpcHandlers() {
     if (win.isMaximized()) win.unmaximize()
     else win.maximize()
   })
+
+  // 自动更新
+  ipcMain.handle('update:check', async () => {
+    const { checkForUpdates, getUpdateState } = require('./updater')
+    await checkForUpdates()
+    return getUpdateState()
+  })
+
+  ipcMain.handle('update:download', async () => {
+    const { downloadUpdate, getUpdateState } = require('./updater')
+    await downloadUpdate()
+    return getUpdateState()
+  })
+
+  ipcMain.handle('update:install', async () => {
+    const { quitAndInstall } = require('./updater')
+    quitAndInstall()
+    return true
+  })
+
+  ipcMain.handle('update:get-state', () => {
+    const { getUpdateState } = require('./updater')
+    return getUpdateState()
+  })
+
+  ipcMain.handle('update:get-mirror', () => {
+    return store.get('update.mirror') || ''
+  })
+
+  ipcMain.handle('update:set-mirror', (_e, mirror) => {
+    store.set('update.mirror', (mirror || '').trim())
+    logEvent('updater.mirror.set', { mirror })
+  })
+
+  ipcMain.handle('update:get-auto-check', () => {
+    return store.get('update.autoCheck') !== false
+  })
+
+  ipcMain.handle('update:set-auto-check', (_e, enabled) => {
+    store.set('update.autoCheck', Boolean(enabled))
+    if (enabled) store.set('update.skippedVersion', '')
+    logEvent('updater.auto-check.set', { enabled })
+  })
+
+  ipcMain.handle('update:get-skipped-version', () => {
+    return store.get('update.skippedVersion') || ''
+  })
 }
 
 module.exports = { registerIpcHandlers, registerGlobalShortcut }
