@@ -96,15 +96,14 @@ jobs:
           fi
 
           # 组装分类正文(空分类自动跳过)
-          NOTES=""
-          emit() { local title="$1"; shift; local -a arr=("$@"); [ ${#arr[@]} -eq 0 ] && return; NOTES+="
-### $title
-"; local i; for i in "${arr[@]}"; do NOTES+="* $i
-"; done; }
+          NOTES_FILE="$(mktemp)"
+          emit() { local title="$1"; shift; local -a arr=("$@"); [ ${#arr[@]} -eq 0 ] && return; printf '\n### %s\n' "$title" >> "$NOTES_FILE"; local i; for i in "${arr[@]}"; do printf '* %s\n' "$i" >> "$NOTES_FILE"; done; }
           emit "✨ 新增" "${FEAT[@]}"
           emit "🔧 优化" "${OPT[@]}"
           emit "🐛 修复" "${FIX[@]}"
           emit "📋 其他" "${OTH[@]}"
+          NOTES="$(<"$NOTES_FILE")"
+          rm -f "$NOTES_FILE"
           [ -z "$NOTES" ] && NOTES="此版本暂无变更记录"
 
           # 依据实际产物文件自动生成下载表(跳过 zip/blockmap/yml 等非安装包)

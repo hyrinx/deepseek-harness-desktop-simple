@@ -1,5 +1,12 @@
 # COMMITS
 
+## 2026-08-26 16:30:00
+
+fix: 修复 release.yml 第 102 行 YAML 语法错误
+
+- 根因：组装分类正文的 `emit()` 函数内使用了跨多行的双引号字符串（`NOTES+="\n...`），触发 GitHub 工作流 YAML 解析错误
+- 修复：改用临时文件（`mktemp`）追加生成分类正文，避免跨行引号
+
 ## 2026-08-26 16:15:00
 
 fix: workflow_dispatch 时 release 检出 main 导致变更记录为空
