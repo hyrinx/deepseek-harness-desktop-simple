@@ -5,8 +5,9 @@
 const { app, globalShortcut, dialog, session, shell } = require('electron')
 const fs = require('node:fs')
 const { spawn } = require('node:child_process')
+const { tmpdir } = require('node:os')
 const { state, clearRef, logEvent, logWriter, bootMark } = require('./state')
-const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, logFilePath, appRootDir, configFilePath, IS_WIN, IS_MAC } = require('./constants')
+const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, logFilePath, appRootDir, IS_WIN, IS_MAC } = require('./constants')
 const { store } = require('./store')
 const { applyAutoStart, isLaunchedByAutostart } = require('./autostart')
 const { registerIpcHandlers, registerGlobalShortcut } = require('./ipc')
@@ -113,9 +114,10 @@ async function openTerminal() {
   logEvent('terminal.open')
   try {
     if (IS_WIN) {
-      const { join, dirname } = require('node:path')
-      const histFile = join(dirname(configFilePath()), 'cmd_history.txt')
-      const ps1Path = join(dirname(configFilePath()), 'open_terminal.ps1')
+      const { join } = require('node:path')
+      const tmpDir = tmpdir()
+      const histFile = join(tmpDir, 'dsh_cmd_history.txt')
+      const ps1Path = join(tmpDir, 'dsh_open_terminal.ps1')
       const ps1 = [
         `$histFile = '${histFile.replace(/'/g, "''")}'`,
         `try { Set-PSReadLineOption -HistorySavePath $histFile -ErrorAction Stop } catch {}`,
@@ -135,8 +137,9 @@ async function openTerminal() {
         shell: true, detached: true, windowsHide: false,
       })
     } else {
-      const { join, dirname } = require('node:path')
-      const shPath = join(dirname(configFilePath()), IS_MAC ? 'open_terminal.command' : 'open_terminal.sh')
+      const { join } = require('node:path')
+      const tmpDir = tmpdir()
+      const shPath = join(tmpDir, IS_MAC ? 'dsh_open_terminal.command' : 'dsh_open_terminal.sh')
       const sh = [
         '#!/bin/bash',
         'cat << \'EOF\'',

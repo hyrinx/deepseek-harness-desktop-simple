@@ -1,1 +1,0 @@
-dsh plugin --profile web list
