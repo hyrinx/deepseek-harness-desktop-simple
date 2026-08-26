@@ -27,11 +27,15 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 ├── package.json         # 项目配置 + electron-builder 配置
 ├── config.json          # 运行时配置（开发模式）
 ├── assets/              # 图标等静态资源
-├── preload/
-│   ├── preload-main.js     # 主窗口 preload（含设置覆盖层 API）
-│   ├── preload-settings.js # 设置页 preload（保留作参考）
-│   └── preload-tray.js     # 托盘 preload
 ├── src/
+│   ├── preload/
+│   │   ├── preload-main.js     # 主窗口 preload（含设置覆盖层 API）
+│   │   ├── preload-settings.js # 设置页 preload（保留作参考）
+│   │   └── preload-tray.js     # 托盘 preload
+│   ├── settings-overlay/
+│   │   ├── style.css              # 设置覆盖层样式
+│   │   ├── settings-overlay.html  # 设置覆盖层 HTML 结构
+│   │   └── settings-overlay.js    # 设置覆盖层 JS 逻辑
 │   ├── constants.js     # 常量 + 路径函数 + 注入脚本
 │   ├── state.js         # 全局状态 + 日志基础设施 + 进程守卫
 │   ├── store.js         # 配置存储（JSON 文件）
@@ -39,7 +43,6 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 │   ├── dsh-home.js      # DSH 路径解析
 │   ├── host.js          # dsh 子进程管理
 │   ├── windows.js       # 主窗口 + 设置覆盖层
-│   ├── settings-overlay.js  # 设置覆盖层注入脚本（注入到主窗口渲染进程）
 │   ├── tray.js          # 托盘 + 托盘菜单
 │   ├── autostart.js     # 开机自启
 │   ├── ipc.js           # IPC 处理器 + 全局快捷键 + 窗口拖拽

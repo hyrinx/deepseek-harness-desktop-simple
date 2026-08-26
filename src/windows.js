@@ -11,7 +11,7 @@ const {
   INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 } = require('./constants')
 
-const PRELOAD_MAIN = join(__dirname, '..', 'preload', 'preload-main.js')
+const PRELOAD_MAIN = join(__dirname, 'preload', 'preload-main.js')
 
 // ── 主窗口 ──
 

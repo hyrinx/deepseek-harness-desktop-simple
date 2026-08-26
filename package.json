@@ -17,8 +17,7 @@
       "main.js",
       "settings.html",
       "assets/**",
-      "src/**",
-      "preload/**"
+      "src/**"
     ],
     "asar": true,
     "directories": {

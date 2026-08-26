@@ -12,7 +12,7 @@ const { APP_NAME, ICON_PATH, IS_MAC, IS_LINUX } = require('./constants')
 
 // ── 托盘菜单：常量 + 内联 HTML ──
 
-const PRELOAD_PATH = join(__dirname, '..', 'preload', 'preload-tray.js')
+const PRELOAD_PATH = join(__dirname, 'preload', 'preload-tray.js')
 
 // 菜单外框尺寸（必须与下方 HTML/CSS 保持一致）
 const MENU_WIDTH = 160
