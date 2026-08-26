@@ -1,5 +1,13 @@
 # COMMITS
 
+## 2026-08-26 16:00:00
+
+feat: 发布正文改为按 conventional commit 分类生成(同 Ghost-Downloader-3)
+
+- 原实现用 `gh api generate-notes` 生成扁平 "What's Changed" 列表,无功能/优化/修复分类
+- 改为基于 `git log` 按提交前缀归类到 `✨ 新增` / `🔧 优化` / `🐛 修复` / `📋 其他` 四个分类区块,空分类自动跳过
+- 恢复对上一版本 tag(`PREV`)的解析,作为对比区间
+
 ## 2026-08-26 15:50:00
 
 fix: 发布正文中 Full Changelog 链接重复

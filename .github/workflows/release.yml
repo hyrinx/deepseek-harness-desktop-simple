@@ -76,9 +76,34 @@ jobs:
         run: |
           set -eo pipefail
           TAG="${{ inputs.tag_name || github.ref_name }}"
-          # 用 tag 让 GitHub 依 commit/PR 生成完整变更记录(含 Contributors,末尾自带 Full Changelog 链接)
-          NOTES="$(gh api -X POST "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$TAG" --jq '.body')"
+          # 上一版本 tag(完整历史由 checkout 的 fetch-depth: 0 提供),用于生成分类更新记录
+          PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
           FILE_URL="https://github.com/${{ github.repository }}/releases/download"
+
+          # 依 conventional commit 前缀,把自上一版本以来的提交归类到各分类区块
+          FEAT=(); FIX=(); OPT=(); OTH=()
+          if [ -n "$PREV" ]; then
+            while IFS= read -r subj; do
+              case "$subj" in
+                feat:*)                       FEAT+=("$subj") ;;
+                fix:*)                        FIX+=("$subj") ;;
+                refactor:*|perf:*|style:*|docs:*|chore:*|ci:*|test:*|build:*|release:*) OPT+=("$subj") ;;
+                *)                            OTH+=("$subj") ;;
+              esac
+            done < <(git log --pretty=format:%s "$PREV..$TAG")
+          fi
+
+          # 组装分类正文(空分类自动跳过)
+          NOTES=""
+          emit() { local title="$1"; shift; local -a arr=("$@"); [ ${#arr[@]} -eq 0 ] && return; NOTES+="
+### $title
+"; local i; for i in "${arr[@]}"; do NOTES+="* $i
+"; done; }
+          emit "✨ 新增" "${FEAT[@]}"
+          emit "🔧 优化" "${OPT[@]}"
+          emit "🐛 修复" "${FIX[@]}"
+          emit "📋 其他" "${OTH[@]}"
+          [ -z "$NOTES" ] && NOTES="此版本暂无变更记录"
 
           # 依据实际产物文件自动生成下载表(跳过 zip/blockmap/yml 等非安装包)
           {
