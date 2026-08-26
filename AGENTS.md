@@ -23,13 +23,13 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 
 ```
 ├── main.js              # 入口（单实例锁 + app 事件 + 启动调度）
-├── settings.html        # 设置页面（单文件内联）
+├── settings.html        # 设置页面（保留作参考，运行时不再独立加载）
 ├── package.json         # 项目配置 + electron-builder 配置
 ├── config.json          # 运行时配置（开发模式）
 ├── assets/              # 图标等静态资源
 ├── preload/
-│   ├── preload-main.js     # 主窗口 preload
-│   ├── preload-settings.js # 设置窗口 preload
+│   ├── preload-main.js     # 主窗口 preload（含设置覆盖层 API）
+│   ├── preload-settings.js # 设置页 preload（保留作参考）
 │   └── preload-tray.js     # 托盘 preload
 ├── src/
 │   ├── constants.js     # 常量 + 路径函数 + 注入脚本
@@ -38,7 +38,8 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 │   ├── env.js           # 运行时模式 + 环境检测 + 插件安装
 │   ├── dsh-home.js      # DSH 路径解析
 │   ├── host.js          # dsh 子进程管理
-│   ├── windows.js       # 主窗口 + 设置窗口
+│   ├── windows.js       # 主窗口 + 设置覆盖层
+│   ├── settings-overlay.js  # 设置覆盖层注入脚本（注入到主窗口渲染进程）
 │   ├── tray.js          # 托盘 + 托盘菜单
 │   ├── autostart.js     # 开机自启
 │   ├── ipc.js           # IPC 处理器 + 全局快捷键 + 窗口拖拽
@@ -67,12 +68,18 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - 日志相关：`logs:get-info`, `logs:open-folder`, `logs:open-file`, `logs:tail`, `logs:clear`
 - 环境检测：委托 `env.js` 的 `registerEnvHandlers`
 - 设置向导：`setup:mark-done`
+- 设置覆盖层：`settings:show-overlay`, `settings:hide-overlay`
 - 窗口拖拽：通过 `window-drag-start/move/end` 事件实现
 
 ### src/lifecycle.js
 - 启动入口 `bootstrap()`：创建主窗口 → 启动 host → 创建托盘 → 导航
-- 首次启动：自动弹出设置窗口，引导用户检查系统环境
+- 首次启动：自动弹出设置覆盖层（注入到主窗口），引导用户检查系统环境
 - 退出/重启：`destroyUI` + `shutdownHost` + `app.quit/relaunch`
+
+### src/settings-overlay.js
+- 设置覆盖层注入脚本，通过 `executeJavaScript` 注入到主窗口渲染进程
+- 包含完整的设置页 CSS/HTML/JS（自包含，零外部依赖）
+- 覆盖层浮在 dsh 网页上方，Esc / 点击遮罩 / 关闭按钮均可关闭
 
 ## 代码规范
 

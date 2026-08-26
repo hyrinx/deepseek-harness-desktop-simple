@@ -7,8 +7,6 @@ const { dirname, join } = require('node:path')
 const APP_NAME = 'DeepSeek Harness'
 const APP_USER_MODEL_ID = 'ai.deepseek.harness.desktop'
 const ICON_PATH = join(__dirname, '..', 'assets', 'favicon.ico')
-const SETTINGS_HTML = join(__dirname, '..', 'settings.html')
-const PRELOAD_SETTINGS = join(__dirname, '..', 'preload', 'preload-settings.js')
 
 const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+Space'
 const READINESS_PREFIX = 'dsh web: '
@@ -18,10 +16,6 @@ const HOST_STDOUT_TAIL_LIMIT = 16_384
 const MAIN_WIN = Object.freeze({
   width: 1440, height: 920,
   minWidth: 960, minHeight: 640,
-})
-const SETTINGS_WIN = Object.freeze({
-  width: 560, height: 640,
-  minWidth: 460, minHeight: 520,
 })
 
 const IS_WIN = process.platform === 'win32'
@@ -187,9 +181,9 @@ const LOADING_HTML = dataUrl(
 
 module.exports = {
   APP_NAME, APP_USER_MODEL_ID,
-  ICON_PATH, SETTINGS_HTML, PRELOAD_SETTINGS,
+  ICON_PATH,
   DEFAULT_SHORTCUT, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT,
-  MAIN_WIN, SETTINGS_WIN,
+  MAIN_WIN,
   IS_WIN, IS_MAC, IS_LINUX, AUTOSTART_ARG,
   appRootDir, dshHomePath, logDirPath, logFilePath, configFilePath,
   INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,

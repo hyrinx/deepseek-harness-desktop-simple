@@ -142,6 +142,19 @@ function registerIpcHandlers() {
     return true
   })
 
+  // 设置覆盖层（注入到主窗口）
+  ipcMain.handle('settings:show-overlay', () => {
+    const { showSettingsOverlay } = require('./windows')
+    showSettingsOverlay()
+    return true
+  })
+
+  ipcMain.handle('settings:hide-overlay', () => {
+    const { hideSettingsOverlay } = require('./windows')
+    hideSettingsOverlay()
+    return true
+  })
+
   // 窗口拖拽（渲染进程 mousedown/mousemove → IPC 坐标 → 主进程 setBounds）
   //
   // ⚠️ 不能调用 win.setPosition：Electron 在 Windows 下存在核心 bug（#48247 / #9477），

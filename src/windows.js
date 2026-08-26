@@ -1,13 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
-// 主窗口 + 设置窗口（创建 / 导航 / CSS 注入 / 显示切换）
+// 主窗口 + 设置覆盖层（创建 / 导航 / CSS 注入 / 覆盖层显示切换）
 // ═══════════════════════════════════════════════════════════════
 
 const { join } = require('node:path')
 const { BrowserWindow, shell } = require('electron')
 const { state, logEvent, bootMark } = require('./state')
 const {
-  APP_NAME, ICON_PATH, SETTINGS_HTML, PRELOAD_SETTINGS,
-  MAIN_WIN, SETTINGS_WIN, IS_WIN, IS_MAC, IS_LINUX,
+  APP_NAME, ICON_PATH,
+  MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
   INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 } = require('./constants')
 
@@ -178,44 +178,39 @@ async function navigateMainWindow() {
   }
 }
 
-// ── 设置窗口 ──
+// ── 设置覆盖层（注入到主窗口，浮在 dsh 网页上方） ──
 
-function createSettingsWindow() {
-  if (state.settingsWindow && !state.settingsWindow.isDestroyed()) {
-    logEvent('settings-window.focus.existing', { id: state.settingsWindow.id })
-    state.settingsWindow.show()
-    state.settingsWindow.focus()
-    return state.settingsWindow
+const fs = require('node:fs')
+const SETTINGS_OVERLAY_SCRIPT = fs.readFileSync(
+  join(__dirname, 'settings-overlay.js'), 'utf-8'
+)
+
+function showSettingsOverlay() {
+  const win = state.mainWindow
+  if (!win || win.isDestroyed()) {
+    logEvent('settings-overlay.show.skip', { reason: win ? 'destroyed' : 'null' }, 'warn')
+    return
   }
-  logEvent('settings-window.create.start')
-  const win = new BrowserWindow({
-    ...SETTINGS_WIN,
-    show: false,
-    autoHideMenuBar: true,
-    title: `设置 - ${APP_NAME}`,
-    icon: ICON_PATH,
-    webPreferences: {
-      preload: PRELOAD_SETTINGS,
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
+  logEvent('settings-overlay.show.start')
+  const injectedKey = '__dshSettingsOverlayInjected'
+  win.webContents.executeJavaScript(`(function(){
+    if (window.${injectedKey}) {
+      if (window.__dshShowSettingsOverlay) window.__dshShowSettingsOverlay()
+    } else {
+      ${SETTINGS_OVERLAY_SCRIPT}
+      if (window.__dshShowSettingsOverlay) window.__dshShowSettingsOverlay()
+    }
+  })()`).catch((err) => {
+    logEvent('settings-overlay.show.fail', { err }, 'error')
   })
-  logEvent('settings-window.create.ok', { id: win.id })
-  state.settingsWindow = win
-  win.on('show', () => logEvent('settings-window.show', { id: win.id }))
-  win.on('closed', () => {
-    logEvent('settings-window.closed', { id: win.id })
-    if (state.settingsWindow === win) state.settingsWindow = null
-  })
-  win.webContents.on('render-process-gone', (_e, details) => {
-    logEvent('settings-window.render-process-gone', { id: win.id, reason: details.reason, exitCode: details.exitCode }, 'error')
-  })
-  win.once('ready-to-show', () => win.show())
-  win.loadFile(SETTINGS_HTML).catch((err) => {
-    logEvent('settings-window.load.fail', { id: win.id, err }, 'error')
-  })
-  return win
+}
+
+function hideSettingsOverlay() {
+  const win = state.mainWindow
+  if (!win || win.isDestroyed()) return
+  win.webContents.executeJavaScript(
+    'if (window.__dshHideSettingsOverlay) window.__dshHideSettingsOverlay()'
+  ).catch(() => {})
 }
 
 // ── 显示/切换 ──
@@ -254,6 +249,7 @@ function toggleWindow() {
 }
 
 module.exports = {
-  createMainWindow, navigateMainWindow, createSettingsWindow,
+  createMainWindow, navigateMainWindow,
+  showSettingsOverlay, hideSettingsOverlay,
   showWindow, toggleWindow,
 }

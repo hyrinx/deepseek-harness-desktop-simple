@@ -29,7 +29,6 @@ function shouldLog(level) {
 // ── 全局状态 ──
 const state = {
   mainWindow: null,
-  settingsWindow: null,
   tray: null,
   trayMenu: null,
   host: null,

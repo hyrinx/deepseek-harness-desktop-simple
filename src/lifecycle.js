@@ -15,14 +15,9 @@ function destroyUI() {
   logEvent('ui.destroy.start', {
     hasTray: Boolean(state.tray),
     hasTrayMenu: Boolean(state.trayMenu),
-    hasSettingsWindow: Boolean(state.settingsWindow),
   })
   clearRef('trayMenu')  // 先销毁菜单窗口（内部会销毁 tray）
   clearRef('tray')      // 再销毁 Electron Tray（兜底，tray 可能已被 trayMenu 销毁）
-  if (state.settingsWindow && !state.settingsWindow.isDestroyed()) {
-    try { state.settingsWindow.destroy() } catch (err) { logEvent('ui.destroy.settings-window.fail', { err }, 'warn') }
-    state.settingsWindow = null
-  }
   logEvent('ui.destroy.done')
 }
 
@@ -200,7 +195,7 @@ async function bootstrap() {
   const silentLaunch = isLaunchedByAutostart()
   logEvent('bootstrap.silentLaunch', { silentLaunch })
 
-  const { createMainWindow, showWindow, navigateMainWindow, createSettingsWindow } = require('./windows')
+  const { createMainWindow, showWindow, navigateMainWindow, showSettingsOverlay } = require('./windows')
   const { createTrayAndMenu } = require('./tray')
   const { spawnDshWeb, waitForHostReady } = require('./host')
 
@@ -233,7 +228,7 @@ async function bootstrap() {
     logEvent('bootstrap.trayMenu.create.start')
     createTrayAndMenu({
       onShowMain: showWindow,
-      onSettings: createSettingsWindow,
+      onSettings: showSettingsOverlay,
       onOpenLogs: openLogFile,
       onOpenTerminal: openTerminal,
       onRestart: requestRestart,
@@ -252,14 +247,12 @@ async function bootstrap() {
   await navigateMainWindow()
   await trayP
 
-  // 首次启动：自动弹出设置窗口，引导用户检查系统环境
-  // 如果 host 未就绪（dsh 未安装），不弹错误对话框，设为首选方式
+  // 首次启动：自动弹出设置覆盖层，引导用户检查系统环境
   if (!store.get('ui.setupDone', false)) {
     logEvent('bootstrap.first-launch.setup-open')
-    // 延迟一小段时间，确保主窗口和托盘都已就绪
     setTimeout(() => {
-      try { createSettingsWindow() } catch (e) {
-        logEvent('bootstrap.first-launch.settings.fail', { err: e }, 'error')
+      try { showSettingsOverlay() } catch (e) {
+        logEvent('bootstrap.first-launch.settings-overlay.fail', { err: e }, 'error')
       }
     }, 800)
   }
