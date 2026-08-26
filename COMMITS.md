@@ -1,5 +1,12 @@
 # COMMITS
 
+## 2026-08-26 15:40:00
+
+fix: auto-tag 调度 Release 工作流 403，缺少 actions:write 权限
+
+- 根因：`gh workflow run` 需要 `actions: write` 权限，`auto-tag` job 仅声明 `contents: write`，导致触发发布工作流时返回 HTTP 403 "Resource not accessible by integration"
+- 修复：[build.yml](../.github/workflows/build.yml) 的 auto-tag job 增加 `actions: write` 权限
+
 ## 2026-08-26 15:25:00
 
 fix: 修复 tag 推送不触发 Release 工作流的问题
