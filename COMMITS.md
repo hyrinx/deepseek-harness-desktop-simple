@@ -1,5 +1,12 @@
 # COMMITS
 
+## 2026-08-26 15:25:00
+
+fix: 修复 tag 推送不触发 Release 工作流的问题
+
+- 根因：GitHub 规定用 `GITHUB_TOKEN` 产生的推送不触发新的 tag 工作流，`auto-tag` 推送 v1.4.0 后 `release.yml` 不会自动运行
+- 修复：[build.yml](../.github/workflows/build.yml) 的 auto-tag 在推完 tag 后用 `gh workflow run "Release"` 显式调度发布工作流（workflow_dispatch 允许 GITHUB_TOKEN 触发）
+
 ## 2026-08-26 15:14:51
 
 feat: 发布自动化（自动打 tag + 自动生成发布正文）

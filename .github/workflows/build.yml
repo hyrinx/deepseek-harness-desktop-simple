@@ -39,7 +39,11 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$TAG"
           git push origin "$TAG"
-          echo "已自动打 tag: $TAG(将触发 Release 工作流)"
+          echo "已自动打 tag: $TAG"
+          # GITHUB_TOKEN 推送不触发 tag 工作流,需显式调度 Release 工作流
+          # (workflow_dispatch 允许由 GITHUB_TOKEN 触发)
+          gh workflow run "Release" -f tag_name="$TAG"
+          echo "已调度 Release 工作流"
 
   build:
     strategy:
