@@ -8,7 +8,7 @@ const { state, logEvent, bootMark } = require('./state')
 const {
   APP_NAME, ICON_PATH,
   MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
-  INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
+  INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, INJECT_WINDOW_CONTROLS_SCRIPT, LOADING_HTML,
 } = require('./constants')
 
 const PRELOAD_MAIN = join(__dirname, 'preload', 'preload-main.js')
@@ -39,7 +39,7 @@ function buildMainWindowOptions() {
   const base = {
     ...MAIN_WIN,
     show: false,
-    frame: IS_WIN || IS_LINUX,
+    frame: false,
     titleBarStyle: IS_MAC ? 'hiddenInset' : 'hidden',
     title: APP_NAME,
     icon: ICON_PATH,
@@ -50,13 +50,6 @@ function buildMainWindowOptions() {
       sandbox: true,
       webSecurity: true,
     },
-  }
-  if (!IS_MAC) {
-    base.titleBarOverlay = {
-      color: '#00000000',
-      symbolColor: '#7f858f',
-      height: 44,
-    }
   }
   if (IS_MAC) {
     base.trafficLightPosition = { x: 16, y: 18 }
@@ -78,6 +71,7 @@ function buildMainWindowOptions() {
 function injectMainWindowCSS(win) {
   win.webContents.on('did-finish-load', () => {
     win.webContents.executeJavaScript(INJECT_DRAG_SCRIPT).catch(() => {})
+    win.webContents.executeJavaScript(INJECT_WINDOW_CONTROLS_SCRIPT).catch(() => {})
     if (IS_WIN) win.webContents.insertCSS(INJECT_SESSION_HEADER_CSS).catch(() => {})
   })
 }
@@ -100,6 +94,14 @@ function bindMainWindowLifecycle(win) {
   win.on('hide', () => logEvent('main-window.hide', { id }))
   win.on('minimize', () => logEvent('main-window.minimize', { id }))
   win.on('restore', () => logEvent('main-window.restore', { id }))
+  win.on('maximize', () => {
+    logEvent('main-window.maximize', { id })
+    win.webContents.send('window-maximize-change', true)
+  })
+  win.on('unmaximize', () => {
+    logEvent('main-window.unmaximize', { id })
+    win.webContents.send('window-maximize-change', false)
+  })
   win.on('focus', () => logEvent('main-window.focus', { id }))
   win.on('blur', () => logEvent('main-window.blur', { id }))
   win.on('close', (event) => {

@@ -16,6 +16,25 @@ contextBridge.exposeInMainWorld('windowDrag', {
   }
 })
 
+// 自绘窗口控制按钮（─ □ ✕）API
+contextBridge.exposeInMainWorld('windowControls', {
+  minimize: () => {
+    ipcRenderer.send('window-minimize')
+  },
+  toggleMaximize: () => {
+    ipcRenderer.invoke('window-toggle-maximize')
+  },
+  close: () => {
+    ipcRenderer.send('close-window')
+  },
+  isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+  onMaximizeChange: (callback) => {
+    const handler = (_event, isMaximized) => callback(isMaximized)
+    ipcRenderer.on('window-maximize-change', handler)
+    return () => ipcRenderer.removeListener('window-maximize-change', handler)
+  }
+})
+
 // 设置覆盖层 API
 contextBridge.exposeInMainWorld('settingsAPI', {
   getSettings: () => ipcRenderer.invoke('settings:get'),

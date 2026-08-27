@@ -206,6 +206,17 @@ function registerIpcHandlers() {
     BrowserWindow.fromWebContents(event.sender)?.close()
   })
 
+  // 自绘最小化按钮
+  ipcMain.on('window-minimize', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize()
+  })
+
+  // 自绘最大化按钮：查询当前最大化状态
+  ipcMain.handle('window-is-maximized', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return win ? win.isMaximized() : false
+  })
+
   // 悬浮标题栏双击最大化/还原
   ipcMain.handle('window-toggle-maximize', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
