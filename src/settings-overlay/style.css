@@ -122,6 +122,7 @@
 #dsh-so .env-status .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 #dsh-so .status-dot.ok { background: var(--green); }
 #dsh-so .status-dot.err { background: var(--red); }
+#dsh-so .status-dot.warn { background: var(--orange); }
 #dsh-so .status-dot.loading { background: var(--blue); animation: dsh-so-pulse 1.2s ease-in-out infinite; }
 #dsh-so .env-version {
   font-family: Consolas,"Cascadia Code","Courier New",monospace;

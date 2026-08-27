@@ -41,9 +41,14 @@ contextBridge.exposeInMainWorld('envAPI', {
   checkDsh: () => ipcRenderer.invoke('env:check-dsh'),
   checkPlugin: () => ipcRenderer.invoke('env:check-plugin'),
   updateNpm: () => ipcRenderer.invoke('env:update-npm'),
-  installPnpm: () => ipcRenderer.invoke('env:install-pnpm'),
+  updatePnpm: () => ipcRenderer.invoke('env:update-pnpm'),
   updateDsh: () => ipcRenderer.invoke('env:update-dsh'),
   updatePlugin: () => ipcRenderer.invoke('env:update-plugin'),
+  onProgress: (callback) => {
+    const handler = (_, text) => callback(text)
+    ipcRenderer.on('env:progress', handler)
+    return () => ipcRenderer.removeListener('env:progress', handler)
+  },
 })
 
 contextBridge.exposeInMainWorld('setupAPI', {
