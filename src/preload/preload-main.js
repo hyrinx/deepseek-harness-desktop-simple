@@ -37,9 +37,11 @@ contextBridge.exposeInMainWorld('logsAPI', {
 contextBridge.exposeInMainWorld('envAPI', {
   checkNode: () => ipcRenderer.invoke('env:check-node'),
   checkNpm: () => ipcRenderer.invoke('env:check-npm'),
+  checkPnpm: () => ipcRenderer.invoke('env:check-pnpm'),
   checkDsh: () => ipcRenderer.invoke('env:check-dsh'),
   checkPlugin: () => ipcRenderer.invoke('env:check-plugin'),
   updateNpm: () => ipcRenderer.invoke('env:update-npm'),
+  installPnpm: () => ipcRenderer.invoke('env:install-pnpm'),
   updateDsh: () => ipcRenderer.invoke('env:update-dsh'),
   updatePlugin: () => ipcRenderer.invoke('env:update-plugin'),
 })

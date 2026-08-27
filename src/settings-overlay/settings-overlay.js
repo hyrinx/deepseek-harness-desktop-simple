@@ -138,8 +138,10 @@
       },
       checkNode: function () { try { return window.envAPI.checkNode() } catch (e) { return { ok: false, error: String(e), version: '' } } },
       checkNpm: function () { try { return window.envAPI.checkNpm() } catch (e) { return { ok: false, error: String(e), version: '' } } },
+      checkPnpm: function () { try { return window.envAPI.checkPnpm() } catch (e) { return { ok: false, error: String(e), version: '' } } },
       checkDsh: function () { try { return window.envAPI.checkDsh() } catch (e) { return { ok: false, error: String(e), version: '' } } },
       updateNpm: function () { try { return window.envAPI.updateNpm() } catch (e) { return { ok: false, error: String(e), output: '' } } },
+      installPnpm: function () { try { return window.envAPI.installPnpm() } catch (e) { return { ok: false, error: String(e), output: '' } } },
       updateDsh: function () { try { return window.envAPI.updateDsh() } catch (e) { return { ok: false, error: String(e), output: '' } } },
       checkPlugin: function () { try { return window.envAPI.checkPlugin() } catch (e) { return { installed: false, version: '', error: String(e) } } },
       updatePlugin: function () { try { return window.envAPI.updatePlugin() } catch (e) { return { ok: false, error: String(e), output: '', beforeVer: '', afterVer: '' } } },
@@ -162,6 +164,7 @@
       env: {
         nodeStatus: qs('nodeStatus'), nodeVersion: qs('nodeVersion'), nodeRefresh: qs('nodeRefreshBtn'),
         npmStatus: qs('npmStatus'), npmVersion: qs('npmVersion'), npmUpdate: qs('npmUpdateBtn'),
+        pnpmStatus: qs('pnpmStatus'), pnpmVersion: qs('pnpmVersion'), pnpmInstall: qs('pnpmInstallBtn'),
         dshStatus: qs('dshStatus'), dshVersion: qs('dshVersion'), dshUpdate: qs('dshUpdateBtn'),
         dshPluginBtn: qs('dshPluginBtn'), dshPluginStatus: qs('dshPluginStatus'), dshPluginVersion: qs('dshPluginVersion'),
         checkAll: qs('checkAllBtn'), updateLog: qs('updateLog'),
@@ -187,6 +190,7 @@
       env: {
         node: { ok: false, version: '', checking: false },
         npm: { ok: false, version: '', checking: false },
+        pnpm: { ok: false, version: '', checking: false },
         dsh: { ok: false, version: '', checking: false },
         plugin: { installed: false, version: '', checking: false },
         globalChecking: false,
@@ -233,6 +237,7 @@
       domFor: function (key) {
         if (key === 'node') return { versionEl: DOM.env.nodeVersion, statusEl: DOM.env.nodeStatus, updateBtn: null, refreshBtn: DOM.env.nodeRefresh }
         if (key === 'npm') return { versionEl: DOM.env.npmVersion, statusEl: DOM.env.npmStatus, updateBtn: DOM.env.npmUpdate, refreshBtn: null }
+        if (key === 'pnpm') return { versionEl: DOM.env.pnpmVersion, statusEl: DOM.env.pnpmStatus, updateBtn: DOM.env.pnpmInstall, refreshBtn: null }
         if (key === 'dsh') return { versionEl: DOM.env.dshVersion, statusEl: DOM.env.dshStatus, updateBtn: DOM.env.dshUpdate, refreshBtn: null }
         if (key === 'plugin') return { versionEl: DOM.env.dshPluginVersion, statusEl: DOM.env.dshPluginStatus, updateBtn: DOM.env.dshPluginBtn, refreshBtn: null }
         return null
@@ -242,6 +247,7 @@
         let p
         if (key === 'node') p = IPC.checkNode()
         else if (key === 'npm') p = IPC.checkNpm()
+        else if (key === 'pnpm') p = IPC.checkPnpm()
         else if (key === 'dsh') p = IPC.checkDsh()
         else if (key === 'plugin') p = IPC.checkPlugin()
         return p.then(function (result) {
@@ -254,12 +260,12 @@
       },
       checkAll: function () {
         state.env.globalChecking = true; this.updateAllState()
-        return Promise.all([this.checkOne('node'), this.checkOne('npm'), this.checkOne('dsh'), this.checkOne('plugin')]).then(function () {
+        return Promise.all([this.checkOne('node'), this.checkOne('npm'), this.checkOne('pnpm'), this.checkOne('dsh'), this.checkOne('plugin')]).then(function () {
           state.env.globalChecking = false; Env.updateAllState()
         })
       },
       updateAllState: function () {
-        const allOk = state.env.node.ok && state.env.npm.ok && state.env.dsh.ok
+        const allOk = state.env.node.ok && state.env.npm.ok && state.env.pnpm.ok && state.env.dsh.ok
         DOM.env.checkAll.disabled = state.env.globalChecking
         DOM.env.checkAll.textContent = state.env.globalChecking ? '检测中...' : '重新检测全部'
         if (allOk && DOM.setupBanner) { DOM.setupBanner.style.display = 'none'; IPC.setupMarkDone() }
@@ -294,6 +300,20 @@
           } else { Toast.error('dsh 更新失败') }
         }).finally(function () { DOM.env.dshUpdate.disabled = false; DOM.env.dshUpdate.textContent = '更新' })
       },
+      installPnpm: function () {
+        DOM.env.pnpmInstall.disabled = true; DOM.env.pnpmInstall.textContent = '安装中...'
+        this.showLog('正在通过 npm 全局安装 pnpm...\n', '')
+        return IPC.installPnpm().then(function (res) {
+          Env.showLog(res.output + '\n', res.ok ? '' : 'error')
+          if (res.ok) {
+            return Env.checkOne('pnpm').then(function () {
+              const afterVer = state.env.pnpm.version
+              if (afterVer) { Env.showLog('pnpm ' + afterVer + ' 安装成功！', 'ok'); Toast.success('pnpm 已安装 ' + afterVer) }
+              else { Env.showLog('pnpm 安装成功！', 'ok'); Toast.success('pnpm 安装成功') }
+            })
+          } else { Toast.error('pnpm 安装失败，请检查 npm 是否正常') }
+        }).finally(function () { DOM.env.pnpmInstall.disabled = false; DOM.env.pnpmInstall.textContent = '安装' })
+      },
       updatePlugin: function () {
         DOM.env.dshPluginBtn.disabled = true; DOM.env.dshPluginBtn.textContent = '检测中...'
         this.showLog('正在检测 dshmarket 插件...\n', '')
@@ -304,6 +324,14 @@
           else { Env.showLog('dshmarket 未安装，正在安装...\n', ''); DOM.env.dshPluginBtn.textContent = '安装中...' }
           return IPC.updatePlugin().then(function (res) {
             Env.showLog(res.output + '\n', res.ok ? '' : 'error')
+            if (!res.ok && res.needPnpm) {
+              Env.showLog('检测到 pnpm 未安装，请先安装 pnpm 后再安装插件\n', 'error')
+              Toast.error('请先安装 pnpm 后再安装插件市场')
+              DOM.env.dshPluginStatus.innerHTML = '<span class="status-dot err"></span> pnpm 未安装'
+              state.env.pnpm.ok = false; state.env.pnpm.version = ''
+              Env.renderOne('pnpm')
+              return
+            }
             if (res.ok) {
               return IPC.checkPlugin().then(function (afterCheck) {
                 state.env.plugin.installed = afterCheck.installed; state.env.plugin.version = afterCheck.version || ''
@@ -562,6 +590,7 @@
       DOM.env.checkAll.addEventListener('click', function () { Env.checkAll() })
       DOM.env.nodeRefresh.addEventListener('click', function () { Env.checkOne('node') })
       DOM.env.npmUpdate.addEventListener('click', function () { Env.updateNpm() })
+      DOM.env.pnpmInstall.addEventListener('click', function () { Env.installPnpm() })
       DOM.env.dshUpdate.addEventListener('click', function () { Env.updateDsh() })
       DOM.env.dshPluginBtn.addEventListener('click', function () { Env.updatePlugin() })
 

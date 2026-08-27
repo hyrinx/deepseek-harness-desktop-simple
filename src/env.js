@@ -50,6 +50,7 @@ function runCmd(cmd, args, timeoutMs = 15_000) {
 
 async function checkNode() { return runCmd('node', ['--version']) }
 async function checkNpm() { return runCmd('npm', ['--version']) }
+async function checkPnpm() { return runCmd('pnpm', ['--version']) }
 async function checkDsh() { return runCmd('dsh', ['--version']) }
 
 async function updateNpm() {
@@ -64,6 +65,23 @@ async function updateNpm() {
           return resolve({ ok: false, error: err.message, output: out })
         }
         require('./state').logEvent('env.update-npm.ok')
+        resolve({ ok: true, error: '', output: out })
+      })
+  })
+}
+
+async function installPnpm() {
+  require('./state').logEvent('env.install-pnpm.start')
+  return new Promise((resolve) => {
+    execFile('npm', ['install', '-g', 'pnpm'],
+      { timeout: 60_000, windowsHide: true, shell: IS_WIN, maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout, stderr) => {
+        const out = (stdout + stderr).trim()
+        if (err) {
+          require('./state').logEvent('env.install-pnpm.fail', { err: err.message }, 'error')
+          return resolve({ ok: false, error: err.message, output: out })
+        }
+        require('./state').logEvent('env.install-pnpm.ok')
         resolve({ ok: true, error: '', output: out })
       })
   })
@@ -142,16 +160,18 @@ async function updatePlugin() {
 function registerEnvHandlers(ipcMain) {
   ipcMain.handle('env:check-node', checkNode)
   ipcMain.handle('env:check-npm', checkNpm)
+  ipcMain.handle('env:check-pnpm', checkPnpm)
   ipcMain.handle('env:check-dsh', checkDsh)
   ipcMain.handle('env:check-plugin', checkPlugin)
   ipcMain.handle('env:update-npm', updateNpm)
+  ipcMain.handle('env:install-pnpm', installPnpm)
   ipcMain.handle('env:update-dsh', updateDsh)
   ipcMain.handle('env:update-plugin', updatePlugin)
 }
 
 module.exports = {
   mode, realExePath,
-  checkNode, checkNpm, checkDsh, checkPlugin,
-  updateNpm, updateDsh, updatePlugin,
+  checkNode, checkNpm, checkPnpm, checkDsh, checkPlugin,
+  updateNpm, installPnpm, updateDsh, updatePlugin,
   registerEnvHandlers,
 }

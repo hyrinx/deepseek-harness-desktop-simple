@@ -213,15 +213,12 @@ async function bootstrap() {
     } catch (err) {
       logEvent('bootstrap.host.fail', { message: err.message }, 'error')
       state.hostOrigin = null
-      // dsh 不存在或启动失败 → 弹窗提示用户自行安装
-      await dialog.showMessageBox({
-        type: 'error',
-        title: `${APP_NAME} 启动失败`,
-        message: '未找到 DeepSeek Harness CLI（dsh），请先安装 Node.js 和 dsh 后再启动。',
-        detail: '安装指南：npm install -g dsh\n\n' + (err.message || ''),
-        buttons: ['退出'],
-      })
-      await requestQuit()
+      // dsh 不存在或启动失败 → 直接打开设置页环境标签页，引导用户检查和安装
+      setTimeout(() => {
+        try { showSettingsOverlay() } catch (e) {
+          logEvent('bootstrap.host-fail.settings-overlay.fail', { err: e }, 'error')
+        }
+      }, 500)
       return
     }
   }
@@ -246,6 +243,14 @@ async function bootstrap() {
   const trayP = startTray()
 
   await hostP
+  if (state.hostOrigin === null) {
+    // dsh 启动失败，设置覆盖层已打开，跳过导航但保留托盘供用户重启
+    logEvent('bootstrap.host-fail.no-host')
+    await trayP
+    const totalTook = bootMark('bootstrap done')
+    logEvent('bootstrap.done.no-host', { tookMs: totalTook })
+    return
+  }
   if (state.isQuitting) return
   await navigateMainWindow()
   await trayP
