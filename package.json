@@ -1,6 +1,6 @@
 {
   "name": "deepseek-harness-desktop-simple",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "DeepSeek Harness 轻量桌面包装",
   "main": "main.js",
   "scripts": {
