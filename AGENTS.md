@@ -10,14 +10,14 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 
 ## 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 桌面框架 | Electron 43 |
-| 主进程 | Node.js (CommonJS) |
-| 渲染进程 | 原生 HTML/CSS/JS（零框架） |
-| 打包 | electron-builder (NSIS + Portable / AppImage + deb + rpm / DMG + zip) |
-| 平台 | Windows (x64) / Linux (x64) / macOS (x64 + arm64) |
-| CI/CD | GitHub Actions (push 构建验证 / tag 自动发布) |
+| 层级     | 技术                                                                  |
+| -------- | --------------------------------------------------------------------- |
+| 桌面框架 | Electron 43                                                           |
+| 主进程   | Node.js (CommonJS)                                                    |
+| 渲染进程 | 原生 HTML/CSS/JS（零框架）                                            |
+| 打包     | electron-builder (NSIS + Portable / AppImage + deb + rpm / DMG + zip) |
+| 平台     | Windows (x64) / Linux (x64) / macOS (x64 + arm64)                     |
+| CI/CD    | GitHub Actions (push 构建验证 / tag 自动发布)                         |
 
 ## 项目结构
 
@@ -52,6 +52,7 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 ## 模块职责
 
 ### src/env.js
+
 - 运行时模式检测（dev / installer / portable）
 - Node.js / npm / dsh 版本检测
 - npm / dsh 更新
@@ -59,12 +60,14 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - IPC 通道注册：`env:check-node`, `env:check-npm`, `env:check-dsh`, `env:check-plugin`, `env:update-npm`, `env:update-dsh`, `env:update-plugin`
 
 ### src/host.js
+
 - dsh 子进程 spawn（`dsh web --host 127.0.0.1 --port 0 --no-open`）
 - 就绪检测（逐行解析 stdout 中的就绪 URL）
 - 进程树终止（Windows: taskkill /t /f）
 - 子进程退出后的自动退出处理
 
 ### src/ipc.js
+
 - 设置相关：`settings:get`, `settings:set-shortcut`, `settings:get-autostart`, `settings:set-autostart`
 - 应用信息：`get-platform`, `get-version`
 - 日志相关：`logs:get-info`, `logs:open-folder`, `logs:open-file`, `logs:tail`, `logs:clear`
@@ -76,12 +79,14 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - 自动更新：委托 `updater.js` 的 `registerUpdaterHandlers`
 
 ### src/lifecycle.js
+
 - 启动入口 `bootstrap()`：创建主窗口 → 启动 host → 创建托盘 → 导航
 - 首次启动：自动弹出设置覆盖层（注入到主窗口），引导用户检查系统环境
 - 退出/重启：`destroyUI` + `shutdownHost` + `app.quit/relaunch`
 - 启动时自动初始化更新器，延迟 5 秒检查更新
 
 ### src/updater.js
+
 - 自动更新模块，支持安装版和便携版两种更新方式
 - **安装版（NSIS）**：使用 `electron-updater` 自动检查、下载、静默安装
 - **便携版**：通过 GitHub API 获取最新 release 信息，手动下载 .exe 并创建替换脚本
@@ -89,6 +94,7 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 - 更新状态通过 IPC 暴露给渲染进程，设置覆盖层"关于"标签页展示更新 UI
 
 ### src/settings-overlay/
+
 - 设置覆盖层注入脚本，通过 `executeJavaScript` 注入到主窗口渲染进程
 - 包含完整的设置页 CSS/HTML/JS（自包含，零外部依赖）
 - 覆盖层浮在 dsh 网页上方，Esc / 点击遮罩 / 关闭按钮均可关闭
@@ -103,18 +109,7 @@ DeepSeek Harness Desktop Simple — 基于 Electron 的轻量桌面壳，Native-
 6. 配置存储使用 `store.get/set` 方法
 7. IPC 通信使用 `ipcMain.handle` + `ipcRenderer.invoke` 模式
 8. preload 通过 `contextBridge.exposeInMainWorld` 暴露 API
-9. 每完成一项改动后，在根目录下生成 `COMMITS.md` 文件，将本次改动的 git 提交信息追加到该文件中，按时间倒序排列，由用户手动提交。格式如下：
-
-   ```
-   ## 2026-08-26 14:30:00
-
-   feat: 添加了 xxx 功能
-
-   - 详细说明改动内容
-   - 详细说明改动原因
-   ```
-
-## 安全注意事项
+9. 安全注意事项
 
 - 所有 IPC 通道名须与注册的 handle 一致
 - 快捷键键名使用白名单 `SHORTCUT_KEYS` 防止越权写入
