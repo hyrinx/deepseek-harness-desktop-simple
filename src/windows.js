@@ -8,7 +8,8 @@ const { state, logEvent, bootMark } = require('./state')
 const {
   APP_NAME, ICON_PATH,
   MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
-  INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, INJECT_WINDOW_CONTROLS_SCRIPT, LOADING_HTML,
+  INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, INJECT_WINDOW_CONTROLS_SCRIPT,
+  INJECT_MARKET_RESTART_SCRIPT, LOADING_HTML,
 } = require('./constants')
 
 const PRELOAD_MAIN = join(__dirname, 'preload', 'preload-main.js')
@@ -72,6 +73,7 @@ function injectMainWindowCSS(win) {
   win.webContents.on('did-finish-load', () => {
     win.webContents.executeJavaScript(INJECT_DRAG_SCRIPT).catch(() => {})
     win.webContents.executeJavaScript(INJECT_WINDOW_CONTROLS_SCRIPT).catch(() => {})
+    win.webContents.executeJavaScript(INJECT_MARKET_RESTART_SCRIPT).catch(() => {})
     if (IS_WIN) win.webContents.insertCSS(INJECT_SESSION_HEADER_CSS).catch(() => {})
   })
 }
