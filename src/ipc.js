@@ -249,15 +249,6 @@ function registerIpcHandlers() {
     return getUpdateState()
   })
 
-  ipcMain.handle('update:get-mirror', () => {
-    return store.get('update.mirror') || ''
-  })
-
-  ipcMain.handle('update:set-mirror', (_e, mirror) => {
-    store.set('update.mirror', (mirror || '').trim())
-    logEvent('updater.mirror.set', { mirror })
-  })
-
   ipcMain.handle('update:get-auto-check', () => {
     return store.get('update.autoCheck') !== false
   })

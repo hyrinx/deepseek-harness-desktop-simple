@@ -88,8 +88,6 @@ contextBridge.exposeInMainWorld('updateAPI', {
   download: () => ipcRenderer.invoke('update:download'),
   install: () => ipcRenderer.invoke('update:install'),
   getState: () => ipcRenderer.invoke('update:get-state'),
-  getMirror: () => ipcRenderer.invoke('update:get-mirror'),
-  setMirror: (mirror) => ipcRenderer.invoke('update:set-mirror', mirror),
   getAutoCheck: () => ipcRenderer.invoke('update:get-auto-check'),
   setAutoCheck: (enabled) => ipcRenderer.invoke('update:set-auto-check', enabled),
   getSkippedVersion: () => ipcRenderer.invoke('update:get-skipped-version'),

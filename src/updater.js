@@ -5,9 +5,7 @@
 // 便携版：手动检查 GitHub API → 下载新 .exe → 替换脚本 → 退出
 // 开发模式：跳过更新检查
 //
-// 镜像支持：可通过 store 配置 update.mirror 为 GitHub 加速镜像前缀
-//   例如：https://ghproxy.com/  或  https://gh.api.99988866.xyz/
-//   设置后所有 GitHub 请求会通过镜像代理
+// 多源检测：内置多个 GitHub 加速镜像，自动依次尝试，无需用户配置
 // ═══════════════════════════════════════════════════════════════
 
 const { app, dialog } = require('electron')
@@ -19,15 +17,11 @@ const UPDATE_REPO = 'hyrinx/deepseek-harness-desktop-simple'
 const UPDATE_FEED_URL = `https://github.com/${UPDATE_REPO}`
 const UPDATE_API_URL = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`
 
-function getMirror() {
-  return (store.get('update.mirror') || '').trim()
-}
-
-function mirrorUrl(url) {
-  const m = getMirror()
-  if (!m) return url
-  return m.replace(/\/+$/, '') + '/' + url
-}
+// 内置镜像源，自动依次尝试
+const MIRRORS = [
+  'https://ghproxy.com/',
+  'https://gh.api.99988866.xyz/',
+]
 
 // 简单语义版本比较：a > b 返回 true
 function isVersionNewer(a, b) {
@@ -83,14 +77,6 @@ function setupInstallerUpdater() {
   au.autoDownload = false
   au.allowDowngrade = false
   au.autoInstallOnAppQuit = true
-
-  // 如果配置了镜像，使用镜像 feed URL
-  const m = getMirror()
-  if (m) {
-    const feedUrl = mirrorUrl(UPDATE_FEED_URL)
-    au.setFeedURL(feedUrl)
-    logEvent('updater.installer.mirror', { feedUrl })
-  }
 
   au.on('checking-for-update', () => {
     logEvent('updater.installer.checking')
@@ -163,7 +149,7 @@ function fetchUrl(url) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http
     const headers = {}
-    if (url.includes('api.github.com')) {
+    if (url.includes('api.github.com') || url.includes('github.com')) {
       headers['User-Agent'] = 'DeepSeekHarnessDesktop/' + (app.getVersion ? app.getVersion() : '0.0.0')
     }
     const req = mod.get(url, { timeout: 30_000, headers }, (res) => {
@@ -183,13 +169,24 @@ function fetchUrl(url) {
   })
 }
 
+// 多源同时检测：所有源并发请求，取最快响应的结果
+async function fetchWithFallback(url) {
+  const urls = [url, ...MIRRORS.map(function (m) { return m.replace(/\/+$/, '') + '/' + url })]
+
+  try {
+    return await Promise.any(urls.map(function (u) { return fetchUrl(u) }))
+  } catch (err) {
+    logEvent('updater.fetch.all-fail', { url, errs: err.errors && err.errors.map(function (e) { return e.message }) }, 'error')
+    throw new Error('所有更新源均不可用，请检查网络连接')
+  }
+}
+
 async function checkForUpdatesPortable() {
   try {
     setUpdateState({ status: 'checking', error: null, checkTime: new Date().toISOString() })
 
-    // 使用 GitHub API 获取最新 release 信息（支持镜像）
-    const apiUrl = mirrorUrl(UPDATE_API_URL)
-    const apiBuf = await fetchUrl(apiUrl)
+    // 多源自动检测最新版本
+    const apiBuf = await fetchWithFallback(UPDATE_API_URL)
     let releaseData
     try {
       releaseData = JSON.parse(apiBuf.toString('utf-8'))
@@ -260,16 +257,14 @@ async function downloadUpdatePortable() {
       downloadUrl = `${UPDATE_FEED_URL}/releases/download/v${version}/${encodeURI(fileName)}`
     }
 
-    // 应用镜像代理
-    downloadUrl = mirrorUrl(downloadUrl)
-
+    // 多源自动检测下载
     logEvent('updater.portable.download-start', { url: downloadUrl, fileName })
 
     // 下载到临时目录
     const tmpDir = require('node:os').tmpdir()
     const destPath = path.join(tmpDir, fileName)
 
-    const buf = await fetchUrl(downloadUrl)
+    const buf = await fetchWithFallback(downloadUrl)
     fs.writeFileSync(destPath, buf)
 
     logEvent('updater.portable.downloaded', { path: destPath, size: buf.length })

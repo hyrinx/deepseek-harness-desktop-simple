@@ -34,9 +34,37 @@
     <div class="tab-content">
       <!-- 环境标签页 -->
       <div class="tab-panel active" id="dsh-so-tab-env">
-        <div class="setup-banner" id="dsh-so-setupBanner">
-          <span class="banner-icon">🛠️</span>
-          <span class="banner-text">首次使用前请检查系统环境。<strong>Node.js</strong> 和 <strong>dsh</strong> 是运行 DeepSeek Harness 的必要条件。</span>
+        <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>软件更新</div>
+          <div class="card-body">
+            <div class="env-row">
+              <div class="env-icon" style="background:linear-gradient(135deg,#1677ff 0%,#4dabf7 100%);">DS</div>
+              <div class="env-info">
+                <div class="env-name">DeepSeek Harness</div>
+                <div class="env-status" id="dsh-so-appStatus"><span class="status-dot loading"></span> 检测中...</div>
+              </div>
+              <span class="env-version loading" id="dsh-so-appVersion">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm" id="dsh-so-appRefreshBtn" disabled>
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                </button>
+                <button class="btn btn-sm btn-primary" id="dsh-so-appDownloadBtn" style="display:none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 1-2 2H5a2 2 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  下载
+                </button>
+                <button class="btn btn-sm btn-primary" id="dsh-so-appInstallBtn" style="display:none;">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                  安装
+                </button>
+              </div>
+            </div>
+            <div class="update-progress" id="dsh-so-appProgress" style="display:none;">
+              <div class="update-progress-bar">
+                <div class="update-progress-fill" id="dsh-so-appFill" style="width:0%;"></div>
+              </div>
+              <span class="update-progress-text" id="dsh-so-appProgressText">0%</span>
+            </div>
+          </div>
         </div>
         <div class="card">
           <div class="card-title"><span class="icon-dot"></span>系统环境检查</div>
@@ -69,20 +97,6 @@
               </div>
             </div>
             <div class="env-row">
-              <div class="env-icon" style="background:linear-gradient(135deg,#f69220 0%,#f9ad4b 100%);">p</div>
-              <div class="env-info">
-                <div class="env-name">pnpm 包管理器</div>
-                <div class="env-status" id="dsh-so-pnpmStatus"><span class="status-dot loading"></span> 检测中...</div>
-              </div>
-              <span class="env-version loading" id="dsh-so-pnpmVersion">-</span>
-              <div class="env-actions">
-                <button class="btn btn-sm btn-primary" id="dsh-so-pnpmUpdateBtn" disabled title="安装 pnpm">
-                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
-                  安装
-                </button>
-              </div>
-            </div>
-            <div class="env-row">
               <div class="env-icon" style="background:linear-gradient(135deg,#1677ff 0%,#4dabf7 100%);">D</div>
               <div class="env-info">
                 <div class="env-name">DeepSeek Harness CLI</div>
@@ -93,6 +107,20 @@
                 <button class="btn btn-sm btn-primary" id="dsh-so-dshUpdateBtn" disabled title="更新到最新版">
                   <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
                   更新
+                </button>
+              </div>
+            </div>
+            <div class="env-row">
+              <div class="env-icon" style="background:linear-gradient(135deg,#f69220 0%,#f9ad4b 100%);">p</div>
+              <div class="env-info">
+                <div class="env-name">pnpm 包管理器</div>
+                <div class="env-status" id="dsh-so-pnpmStatus"><span class="status-dot loading"></span> 检测中...</div>
+              </div>
+              <span class="env-version loading" id="dsh-so-pnpmVersion">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm btn-primary" id="dsh-so-pnpmUpdateBtn" disabled title="安装 pnpm">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                  安装
                 </button>
               </div>
             </div>
@@ -125,6 +153,10 @@
             </button>
           </div>
         </div>
+        <div class="setup-banner" id="dsh-so-setupBanner">
+          <span class="banner-icon">🛠️</span>
+          <span class="banner-text">首次使用前请检查系统环境。<strong>Node.js</strong> 和 <strong>dsh</strong> 是运行 DeepSeek Harness 的必要条件。</span>
+        </div>
       </div>
       <!-- 常规标签页 -->
       <div class="tab-panel" id="dsh-so-tab-general">
@@ -139,6 +171,20 @@
               <div class="setting-control">
                 <label class="switch">
                   <input type="checkbox" id="dsh-so-autostartInput" aria-label="开机自动启动开关">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div style="border-top:1px solid var(--gray-200);margin:12px 0;"></div>
+            <div class="setting-row">
+              <div class="setting-info">
+                <div class="setting-name">启动时自动检查更新</div>
+                <div class="setting-desc" id="dsh-so-updateAutoCheckDesc">开启后，启动时自动检查并弹窗提示新版本</div>
+                <div class="setting-desc" id="dsh-so-updateSkippedVersion" style="display:none;color:var(--orange);"></div>
+              </div>
+              <div class="setting-control">
+                <label class="switch">
+                  <input type="checkbox" id="dsh-so-updateAutoCheckInput" checked />
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -167,7 +213,7 @@
             </div>
           </div>
         </div>
-      </div>
+        </div>
       <!-- 关于标签页 -->
       <div class="tab-panel" id="dsh-so-tab-about">
         <div class="card">
@@ -178,64 +224,8 @@
               <li><span class="about-label">版本</span><span class="about-value"><code id="dsh-so-appVersion">0.1.0</code></span></li>
               <li><span class="about-label">平台</span><span class="about-value"><code id="dsh-so-appPlatform">-</code></span></li>
               <li><span class="about-label">说明</span><span class="about-value">DeepSeek 轻量桌面包装，基于 Electron</span></li>
+              <li><span class="about-label">GitHub</span><span class="about-value"><a class="about-link" href="https://github.com/hyrinx/deepseek-harness-desktop-simple" target="_blank">github.com/hyrinx/deepseek-harness-desktop-simple</a></span></li>
             </ul>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="icon-dot"></span>软件更新</div>
-          <div class="card-body">
-            <div class="update-section" id="dsh-so-updateSection">
-              <div class="update-status" id="dsh-so-updateStatus">
-                <span class="status-dot loading"></span>
-                <span id="dsh-so-updateStatusText">准备中...</span>
-              </div>
-              <div class="update-progress" id="dsh-so-updateProgress" style="display:none;">
-                <div class="update-progress-bar">
-                  <div class="update-progress-fill" id="dsh-so-updateFill" style="width:0%;"></div>
-                </div>
-                <span class="update-progress-text" id="dsh-so-updateProgressText">0%</span>
-              </div>
-              <div class="update-actions">
-                <button class="btn btn-sm" id="dsh-so-updateCheckBtn">
-                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                  检查更新
-                </button>
-                <button class="btn btn-sm btn-primary" id="dsh-so-updateDownloadBtn" style="display:none;">
-                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  下载更新
-                </button>
-                <button class="btn btn-sm btn-primary" id="dsh-so-updateInstallBtn" style="display:none;">
-                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                  安装并重启
-                </button>
-              </div>
-              <div class="update-check-time" id="dsh-so-updateCheckTime" style="display:none;"></div>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="icon-dot"></span>更新设置</div>
-          <div class="card-body">
-            <label class="switch-row" style="margin-bottom:6px;">
-              <span class="switch-label">启动时自动检查更新</span>
-              <div class="switch">
-                <input type="checkbox" id="dsh-so-updateAutoCheckInput" checked />
-                <span class="switch-slider"></span>
-              </div>
-            </label>
-            <p class="card-desc" id="dsh-so-updateAutoCheckDesc">开启后，启动时自动检查并弹窗提示新版本</p>
-            <p class="card-desc" id="dsh-so-updateSkippedVersion" style="display:none;color:var(--orange);"></p>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="icon-dot"></span>更新镜像</div>
-          <div class="card-body">
-            <p class="card-desc" style="margin-bottom:8px;">如果你无法直接访问 GitHub，可设置加速镜像。留空则直连 GitHub。</p>
-            <div style="display:flex;gap:8px;">
-              <input type="text" class="input" id="dsh-so-updateMirrorInput" placeholder="例如：https://ghproxy.com/" style="flex:1;font-size:12px;" />
-              <button class="btn btn-sm" id="dsh-so-updateMirrorSaveBtn">保存</button>
-            </div>
-            <p class="card-desc" style="margin-top:6px;font-size:11px;color:var(--gray-600);">常用镜像：<code>https://ghproxy.com/</code> 或 <code>https://gh.api.99988866.xyz/</code></p>
           </div>
         </div>
       </div>

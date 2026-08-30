@@ -151,8 +151,7 @@
       updateDownload: function () { try { return window.updateAPI.download() } catch (e) { return { status: 'error', error: String(e) } } },
       updateInstall: function () { try { return window.updateAPI.install() } catch (e) { return false } },
       updateGetState: function () { try { return window.updateAPI.getState() } catch (e) { return { status: 'error', error: String(e) } } },
-      updateGetMirror: function () { try { return window.updateAPI.getMirror() } catch (e) { return '' } },
-      updateSetMirror: function (mirror) { try { return window.updateAPI.setMirror(mirror) } catch (e) { return false } },
+      
       updateGetAutoCheck: function () { try { return window.updateAPI.getAutoCheck() } catch (e) { return true } },
       updateSetAutoCheck: function (enabled) { try { return window.updateAPI.setAutoCheck(enabled) } catch (e) { return false } },
       updateGetSkippedVersion: function () { try { return window.updateAPI.getSkippedVersion() } catch (e) { return '' } },
@@ -164,6 +163,9 @@
       sizer: qs('recorderSizer'), input: qs('recorderInput'), label: qs('recorderLabel'), resetBtn: qs('resetBtn'),
       autostart: { input: qs('autostartInput'), desc: qs('autostartDesc') },
       env: {
+        appStatus: qs('appStatus'), appVersion: qs('appVersion'), appRefresh: qs('appRefreshBtn'),
+        appDownload: qs('appDownloadBtn'), appInstall: qs('appInstallBtn'),
+        appProgress: qs('appProgress'), appFill: qs('appFill'), appProgressText: qs('appProgressText'),
         nodeStatus: qs('nodeStatus'), nodeVersion: qs('nodeVersion'), nodeRefresh: qs('nodeRefreshBtn'),
         npmStatus: qs('npmStatus'), npmVersion: qs('npmVersion'), npmUpdate: qs('npmUpdateBtn'),
         pnpmStatus: qs('pnpmStatus'), pnpmVersion: qs('pnpmVersion'), pnpmUpdate: qs('pnpmUpdateBtn'),
@@ -174,13 +176,8 @@
       setupBanner: qs('setupBanner'),
     }
 
-    // ── 更新 UI DOM ──
+    // ── 更新 UI DOM（仅自动检查相关，更新状态由 Env 模块管理）──
     DOM.update = {
-      checkBtn: qs('updateCheckBtn'), downloadBtn: qs('updateDownloadBtn'), installBtn: qs('updateInstallBtn'),
-      statusText: qs('updateStatusText'), statusDot: qs('updateStatus').querySelector('.status-dot'),
-      progress: qs('updateProgress'), fill: qs('updateFill'), progressText: qs('updateProgressText'),
-      checkTime: qs('updateCheckTime'),
-      mirrorInput: qs('updateMirrorInput'), mirrorSaveBtn: qs('updateMirrorSaveBtn'),
       autoCheckInput: qs('updateAutoCheckInput'), autoCheckDesc: qs('updateAutoCheckDesc'),
       skippedVersion: qs('updateSkippedVersion'),
     }
@@ -190,6 +187,7 @@
       recorder: { shortcut: DEFAULT_SHORTCUT, draft: '', recording: false },
       autostart: { enabled: false, available: false, actuallySet: false, busy: false },
       env: {
+        app: { checking: false, status: 'idle', version: '', latestVersion: '', progress: 0 },
         node: { ok: false, version: '', checking: false },
         npm: { ok: false, version: '', latestVersion: '', checking: false },
         pnpm: { ok: false, version: '', latestVersion: '', checking: false },
@@ -214,6 +212,47 @@
           return
         }
         versionEl.classList.remove('loading')
+        if (key === 'app') {
+          DOM.env.appDownload.style.display = 'none'
+          DOM.env.appInstall.style.display = 'none'
+          DOM.env.appProgress.style.display = 'none'
+          if (refreshBtn) refreshBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>'
+          switch (info.status) {
+            case 'available':
+              versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
+              statusEl.innerHTML = '<span class="status-dot warn"></span> 有新版本可用'
+              DOM.env.appDownload.style.display = 'inline-flex'
+              break
+            case 'downloading':
+              versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
+              statusEl.innerHTML = '<span class="status-dot loading"></span> 正在下载...'
+              DOM.env.appProgress.style.display = 'flex'
+              DOM.env.appFill.style.width = info.progress + '%'
+              DOM.env.appProgressText.textContent = info.progress + '%'
+              if (refreshBtn) refreshBtn.style.display = 'none'
+              break
+            case 'downloaded':
+              versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
+              statusEl.innerHTML = '<span class="status-dot ok"></span> 下载完成，准备安装'
+              DOM.env.appInstall.style.display = 'inline-flex'
+              if (refreshBtn) refreshBtn.style.display = 'none'
+              break
+            case 'no-update':
+              versionEl.textContent = 'v' + info.version
+              statusEl.innerHTML = '<span class="status-dot ok"></span> 已是最新版本'
+              break
+            case 'error':
+              versionEl.textContent = 'v' + info.version
+              statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.latestVersion || '检查失败')
+              break
+            default:
+              versionEl.textContent = 'v' + info.version
+              statusEl.innerHTML = '<span class="status-dot loading"></span> 准备中...'
+              break
+          }
+          if (refreshBtn) refreshBtn.disabled = (info.status === 'checking' || info.status === 'downloading' || info.status === 'downloaded')
+          return
+        }
         if (key === 'plugin') {
           if (info.installed) {
             const hasUpdate = info.latestVersion && info.version && info.latestVersion !== info.version
@@ -266,6 +305,7 @@
         if (key === 'pnpm') return { versionEl: DOM.env.pnpmVersion, statusEl: DOM.env.pnpmStatus, updateBtn: DOM.env.pnpmUpdate, refreshBtn: null }
         if (key === 'dsh') return { versionEl: DOM.env.dshVersion, statusEl: DOM.env.dshStatus, updateBtn: DOM.env.dshUpdate, refreshBtn: null }
         if (key === 'plugin') return { versionEl: DOM.env.dshPluginVersion, statusEl: DOM.env.dshPluginStatus, updateBtn: DOM.env.dshPluginBtn, refreshBtn: null }
+        if (key === 'app') return { versionEl: DOM.env.appVersion, statusEl: DOM.env.appStatus, updateBtn: null, refreshBtn: DOM.env.appRefresh }
         return null
       },
       checkOne: function (key) {
@@ -276,9 +316,11 @@
         else if (key === 'pnpm') p = IPC.checkPnpm()
         else if (key === 'dsh') p = IPC.checkDsh()
         else if (key === 'plugin') p = IPC.checkPlugin()
+        else if (key === 'app') p = IPC.updateCheck().then(function (st) { return { status: st.status, latestVersion: st.version, error: st.error, progress: st.progress } })
         return p.then(function (result) {
           state.env[key].checking = false
-          if (key === 'plugin') { state.env[key].installed = result.installed; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
+          if (key === 'app') { state.env[key].status = result.status; state.env[key].version = (qs('appVersion').textContent || '').replace('v', ''); state.env[key].latestVersion = result.latestVersion || ''; state.env[key].progress = result.progress || 0 }
+          else if (key === 'plugin') { state.env[key].installed = result.installed; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
           else { state.env[key].ok = result.ok; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
           Env.renderOne(key); Env.updateAllState()
           return result
@@ -286,7 +328,7 @@
       },
       checkAll: function () {
         state.env.globalChecking = true; this.updateAllState()
-        return Promise.all([this.checkOne('node'), this.checkOne('npm'), this.checkOne('pnpm'), this.checkOne('dsh'), this.checkOne('plugin')]).then(function () {
+        return Promise.all([this.checkOne('node'), this.checkOne('npm'), this.checkOne('pnpm'), this.checkOne('dsh'), this.checkOne('plugin'), this.checkOne('app')]).then(function () {
           state.env.globalChecking = false; Env.updateAllState()
         })
       },
@@ -445,86 +487,13 @@
       },
     }
 
-    // ── 自动更新模块 ──
+    // ── 自动更新模块（下载/安装/自动检查设置）──
     const Update = {
-      render: function (st) {
-        st = st || { status: 'idle', version: null, error: null, progress: 0, checkTime: null }
-        const dot = DOM.update.statusDot
-        const text = DOM.update.statusText
-        const checkBtn = DOM.update.checkBtn
-        const downloadBtn = DOM.update.downloadBtn
-        const installBtn = DOM.update.installBtn
-        const progress = DOM.update.progress
-        const fill = DOM.update.fill
-        const progressText = DOM.update.progressText
-        const checkTime = DOM.update.checkTime
-
-        dot.className = 'status-dot'
-        checkBtn.disabled = false
-        downloadBtn.style.display = 'none'
-        installBtn.style.display = 'none'
-        progress.style.display = 'none'
-        checkTime.style.display = 'none'
-
-        switch (st.status) {
-          case 'checking':
-            dot.classList.add('loading')
-            text.textContent = '正在检查更新...'
-            checkBtn.disabled = true
-            break
-          case 'available':
-            dot.classList.add('ok')
-            text.textContent = '发现新版本 v' + st.version
-            downloadBtn.style.display = 'inline-flex'
-            break
-          case 'downloading':
-            dot.classList.add('loading')
-            text.textContent = '正在下载 v' + st.version + '...'
-            progress.style.display = 'flex'
-            fill.style.width = st.progress + '%'
-            progressText.textContent = st.progress + '%'
-            checkBtn.disabled = true
-            downloadBtn.style.display = 'none'
-            break
-          case 'downloaded':
-            dot.classList.add('ok')
-            text.textContent = 'v' + st.version + ' 下载完成，准备安装'
-            installBtn.style.display = 'inline-flex'
-            break
-          case 'no-update':
-            dot.classList.add('ok')
-            text.textContent = '已是最新版本' + (st.version ? ' (v' + st.version + ')' : '')
-            break
-          case 'error':
-            dot.classList.add('err')
-            text.textContent = '更新检查失败: ' + (st.error || '未知错误')
-            break
-          default:
-            dot.classList.add('loading')
-            text.textContent = '准备中...'
-            break
-        }
-
-        if (st.checkTime) {
-          checkTime.style.display = 'block'
-          checkTime.textContent = '上次检查: ' + new Date(st.checkTime).toLocaleString()
-        }
-      },
-      load: function () {
-        return IPC.updateGetState().then(function (st) { Update.render(st) })
-      },
-      check: function () {
-        Update.render({ status: 'checking' })
-        return IPC.updateCheck().then(function (st) {
-          Update.render(st)
-          if (st.status === 'available') { Toast.info('发现新版本 v' + st.version) }
-          else if (st.status === 'no-update') { Toast.success('已是最新版本') }
-          else if (st.status === 'error') { Toast.error('检查失败: ' + (st.error || '')) }
-        })
-      },
       download: function () {
         return IPC.updateDownload().then(function (st) {
-          Update.render(st)
+          state.env.app.status = st.status
+          state.env.app.progress = st.progress || 0
+          Env.renderOne('app')
           if (st.status === 'downloaded') { Toast.success('下载完成，点击安装并重启') }
           else if (st.status === 'error') { Toast.error('下载失败: ' + (st.error || '')) }
         })
@@ -532,21 +501,6 @@
       install: function () {
         Toast.info('正在准备安装...')
         IPC.updateInstall()
-      },
-      loadMirror: function () {
-        return IPC.updateGetMirror().then(function (m) {
-          DOM.update.mirrorInput.value = m || ''
-        })
-      },
-      saveMirror: function () {
-        const mirror = DOM.update.mirrorInput.value.trim()
-        DOM.update.mirrorSaveBtn.disabled = true
-        DOM.update.mirrorSaveBtn.textContent = '保存中...'
-        return IPC.updateSetMirror(mirror).then(function () {
-          Toast.success(mirror ? '镜像已保存' : '已清除镜像，恢复直连')
-          DOM.update.mirrorSaveBtn.disabled = false
-          DOM.update.mirrorSaveBtn.textContent = '保存'
-        })
       },
       loadAutoCheck: function () {
         return IPC.updateGetAutoCheck().then(function (enabled) {
@@ -629,10 +583,9 @@
       })
 
       // 更新按钮
-      DOM.update.checkBtn.addEventListener('click', function () { Update.check() })
-      DOM.update.downloadBtn.addEventListener('click', function () { Update.download() })
-      DOM.update.installBtn.addEventListener('click', function () { Update.install() })
-      DOM.update.mirrorSaveBtn.addEventListener('click', function () { Update.saveMirror() })
+      DOM.env.appRefresh.addEventListener('click', function () { Env.checkOne('app') })
+      DOM.env.appDownload.addEventListener('click', function () { Update.download() })
+      DOM.env.appInstall.addEventListener('click', function () { Update.install() })
       DOM.update.autoCheckInput.addEventListener('change', function () { Update.toggleAutoCheck() })
     }
 
@@ -640,12 +593,13 @@
     document.getElementById('dsh-so-backdrop').addEventListener('click', function () { window.__dshHideSettingsOverlay() })
     document.getElementById('dsh-so-panel').addEventListener('click', function (e) { e.stopPropagation() })
 
-    Promise.all([IPC.getSettings(), IPC.fillAboutInfo(), AutoStart.load(), Env.checkAll(), Update.load(), Update.loadMirror(), Update.loadAutoCheck()]).then(function (r) {
+    bindEvents()
+
+    Promise.all([IPC.getSettings(), IPC.fillAboutInfo(), AutoStart.load(), Env.checkAll(), Update.loadAutoCheck()]).then(function (r) {
       const settings = r[0]
       const saved = settings && settings.shortcuts && settings.shortcuts.toggleWindow
       if (saved !== undefined && saved !== null) { state.recorder.shortcut = saved; state.recorder.draft = saved }
       Recorder.render()
-      bindEvents()
     }).catch(function (e) {
       console.error('[settings-overlay] 初始化失败', e)
       Toast.error('初始化失败')
