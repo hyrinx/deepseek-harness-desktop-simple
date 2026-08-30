@@ -277,8 +277,40 @@ async function bootstrap() {
 
   // 自动更新：安装更新器 + 延迟检查更新（避免阻塞启动）
   try {
-    const { setupUpdater, checkForUpdates, downloadUpdate, quitAndInstall, onStartupUpdateAvailable } = require('./updater')
+    const {
+      setupUpdater, checkForUpdates, downloadUpdate, quitAndInstall,
+      onStartupUpdateAvailable, onUpdateStateChange,
+    } = require('./updater')
     setupUpdater()
+
+    // 把更新状态实时广播给主窗口渲染层（设置页进度条、手动下载等）
+    let _pendingPopupInstall = false
+    onUpdateStateChange((st) => {
+      const w = state.mainWindow
+      if (w && !w.isDestroyed()) {
+        try { w.webContents.send('update:state', st) } catch { /* 忽略 */ }
+      }
+      // 弹窗发起的下载在校验通过后，直接询问是否退出更新（一条龙，无需再去设置页）
+      if (st.status === 'downloaded' && _pendingPopupInstall) {
+        _pendingPopupInstall = false
+        const { dialog } = require('electron')
+        dialog.showMessageBox({
+          type: 'info',
+          title: '下载完成',
+          message: `新版本 v${st.version} 已下载并校验通过`,
+          detail: '即将退出应用并替换程序文件，完成后会自动重新打开。',
+          buttons: ['立即退出并更新', '稍后(可在设置页安装)'],
+          defaultId: 0,
+          cancelId: 1,
+        }).then(({ response }) => {
+          if (response === 0) {
+            quitAndInstall()
+          } else {
+            logEvent('updater.startup-install.deferred')
+          }
+        })
+      }
+    })
 
     // 启动时发现新版本 → 弹窗询问用户
     onStartupUpdateAvailable((version) => {
@@ -287,12 +319,15 @@ async function bootstrap() {
         type: 'info',
         title: '发现新版本',
         message: `发现新版本 v${version}`,
-        detail: '下载完成后可在设置页「关于」标签中安装。',
+        detail: '点击「立即下载」将自动下载、校验，完成后提示退出更新。',
         buttons: ['立即下载', '跳过此版本', '不再提醒'],
         defaultId: 0,
         cancelId: 1,
       }).then(({ response }) => {
         if (response === 0) {
+          _pendingPopupInstall = true
+          // 打开设置页展示下载进度，避免用户点完按钮看不到任何反馈
+          try { showSettingsOverlay() } catch { /* 忽略 */ }
           downloadUpdate().catch((err) => {
             logEvent('updater.startup-download.fail', { err: err.message }, 'warn')
           })

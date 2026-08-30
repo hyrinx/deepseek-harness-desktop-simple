@@ -1,64 +1,75 @@
 // ═══════════════════════════════════════════════════════════════
-// 自动更新（安装版 electron-updater + 便携版手动下载）
+// 自动更新（安装版 electron-updater + 便携版 流式下载+校验）
 //
-// 安装版（NSIS）：electron-updater 自动处理，下载安装包 → 静默安装
-// 便携版：手动检查 GitHub API → 下载新 .exe → 替换脚本 → 退出
-// 开发模式：跳过更新检查
+// 安装版（NSIS）：electron-updater 自动处理
+// 便携版：从 versions.json 发布清单取最新版本 → 流式下载 exe →
+//        SHA-256 / 大小 / PE 文件头三重校验 → 退出替换
+// 开发模式：默认跳过；设 DSH_UPDATER_TEST=1 可走便携版流程做测试
 //
-// 多源检测：内置多个 GitHub 加速镜像，自动依次尝试，无需用户配置
+// 多源检测：GitHub 直连 + 内置镜像 + 用户自定义镜像 (config.json#update.mirror)
+//          校验通过才算成功，杜绝"把 HTML 错误页当 exe"。
 // ═══════════════════════════════════════════════════════════════
 
-const { app, dialog } = require('electron')
+const { app, shell } = require('electron')
+const https = require('node:https')
+const http = require('node:http')
+const fs = require('node:fs')
+const path = require('node:path')
+const crypto = require('node:crypto')
+const { spawn } = require('node:child_process')
+const { basename } = require('node:path')
 const { logEvent } = require('./state')
 const { mode } = require('./env')
 const { store } = require('./store')
+const { IS_WIN } = require('./constants')
+const {
+  isVersionNewer, normalizeVersion, platformKey, bytesArePe, sha256File, buildMirrorSources,
+} = require('./updater-util')
 
 const UPDATE_REPO = 'hyrinx/deepseek-harness-desktop-simple'
 const UPDATE_FEED_URL = `https://github.com/${UPDATE_REPO}`
-const UPDATE_API_URL = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`
+const RELEASE_PAGE = `${UPDATE_FEED_URL}/releases/latest`
+// 发布清单：优先读 main 分支根目录 versions.json（直连 + 镜像）
+const MANIFEST_URL = `https://raw.githubusercontent.com/${UPDATE_REPO}/main/versions.json`
 
-// 内置镜像源，自动依次尝试
+// 内置镜像源（备用，可被用户自定义镜像覆盖/补充）
 const MIRRORS = [
   'https://ghproxy.com/',
   'https://gh.api.99988866.xyz/',
 ]
 
-// 简单语义版本比较：a > b 返回 true
-function isVersionNewer(a, b) {
-  if (!a || !b) return false
-  const av = a.split('.').map(Number)
-  const bv = b.split('.').map(Number)
-  for (let i = 0; i < Math.max(av.length, bv.length); i++) {
-    if ((av[i] || 0) > (bv[i] || 0)) return true
-    if ((av[i] || 0) < (bv[i] || 0)) return false
-  }
-  return false
+// 是否开启"开发模式走便携版更新"的测试开关
+function isUpdaterTest() {
+  return process.env.DSH_UPDATER_TEST === '1'
 }
 
 // ── 更新状态（供 UI 读取） ──
 const updateState = {
-  status: 'idle',           // idle | checking | available | downloading | downloaded | error | no-update
+  status: 'idle',           // idle | checking | available | downloading | verifying | downloaded | error | no-update
   version: null,            // 新版本号
   downloadedFile: null,     // 下载的文件路径（便携版）
   error: null,              // 错误信息
   progress: 0,              // 下载进度 0-100
+  size: 0,                  // 待下载文件字节数
   checkTime: null,          // 上次检查时间
 }
 
 // 启动时发现更新后的回调（由 lifecycle.js 设置，用于弹窗询问用户）
 let _onStartupUpdateAvailable = null
+// 状态变化广播（main 进程转给渲染层 + 弹窗流程使用）
+let _stateListener = null
 
-function onStartupUpdateAvailable(cb) {
-  _onStartupUpdateAvailable = cb
-}
+function onStartupUpdateAvailable(cb) { _onStartupUpdateAvailable = cb }
+function onUpdateStateChange(cb) { _stateListener = cb }
 
-function getUpdateState() {
-  return { ...updateState }
-}
+function getUpdateState() { return { ...updateState } }
 
 function setUpdateState(patch) {
   Object.assign(updateState, patch)
   logEvent('updater.state', patch)
+  if (_stateListener) {
+    try { _stateListener({ ...updateState }) } catch { /* 忽略监听器异常 */ }
+  }
 }
 
 // ── 安装版：electron-updater ──
@@ -82,26 +93,21 @@ function setupInstallerUpdater() {
     logEvent('updater.installer.checking')
     setUpdateState({ status: 'checking', error: null })
   })
-
   au.on('update-available', (info) => {
     logEvent('updater.installer.available', { version: info.version })
     setUpdateState({ status: 'available', version: info.version, error: null })
   })
-
   au.on('update-not-available', (info) => {
     logEvent('updater.installer.not-available', { version: info.version })
     setUpdateState({ status: 'no-update', version: info.version, error: null, checkTime: new Date().toISOString() })
   })
-
   au.on('download-progress', (progress) => {
     setUpdateState({ progress: Math.round(progress.percent) })
   })
-
   au.on('update-downloaded', (info) => {
     logEvent('updater.installer.downloaded', { version: info.version, file: info.downloadedFile })
     setUpdateState({ status: 'downloaded', version: info.version, downloadedFile: info.downloadedFile, progress: 100 })
   })
-
   au.on('error', (err) => {
     logEvent('updater.installer.error', { err: err.message }, 'error')
     setUpdateState({ status: 'error', error: err.message })
@@ -136,90 +142,192 @@ function quitAndInstallInstaller() {
   au.quitAndInstall()
 }
 
-// ── 便携版：手动下载 ──
+// ── 通用 HTTP（小文件取 buffer / 大文件流式写盘） ──
 
-const https = require('node:https')
-const http = require('node:http')
-const fs = require('node:fs')
-const path = require('node:path')
-const { spawn } = require('node:child_process')
-const { IS_WIN } = require('./constants')
+const UA_HEADER = 'DeepSeekHarnessDesktop/' + (app.getVersion ? app.getVersion() : '0.0.0')
 
-function fetchUrl(url) {
+function httpGet(url, { timeoutMs = 30_000, onResponse }) {
   return new Promise((resolve, reject) => {
     const mod = url.startsWith('https') ? https : http
     const headers = {}
-    if (url.includes('api.github.com') || url.includes('github.com')) {
-      headers['User-Agent'] = 'DeepSeekHarnessDesktop/' + (app.getVersion ? app.getVersion() : '0.0.0')
-    }
-    const req = mod.get(url, { timeout: 30_000, headers }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchUrl(res.headers.location).then(resolve).catch(reject)
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode}`))
-      }
-      const chunks = []
-      res.on('data', (c) => chunks.push(c))
-      res.on('end', () => resolve(Buffer.concat(chunks)))
-      res.on('error', reject)
-    })
+    if (url.includes('api.github.com') || url.includes('github.com')) headers['User-Agent'] = UA_HEADER
+    const req = mod.get(url, { timeout: timeoutMs, headers }, (res) => resolve(res))
     req.on('error', reject)
     req.on('timeout', () => { req.destroy(); reject(new Error('请求超时')) })
   })
 }
 
-// 多源同时检测：所有源并发请求，取最快响应的结果
-async function fetchWithFallback(url) {
-  const urls = [url, ...MIRRORS.map(function (m) { return m.replace(/\/+$/, '') + '/' + url })]
-
-  try {
-    return await Promise.any(urls.map(function (u) { return fetchUrl(u) }))
-  } catch (err) {
-    logEvent('updater.fetch.all-fail', { url, errs: err.errors && err.errors.map(function (e) { return e.message }) }, 'error')
-    throw new Error('所有更新源均不可用，请检查网络连接')
+// 小文件：整体读入内存（用于取 release 清单），拒绝非 JSON 的 HTML 错误页
+async function fetchBuffer(url, timeoutMs = 30_000) {
+  const res = await httpGet(url, { timeoutMs })
+  if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+    res.resume()
+    return fetchBuffer(res.headers.location, timeoutMs)
   }
+  if (res.statusCode !== 200) {
+    res.resume()
+    throw new Error(`HTTP ${res.statusCode}`)
+  }
+  const ct = (res.headers['content-type'] || '').toLowerCase()
+  if (ct.includes('text/html')) {
+    res.resume()
+    throw new Error('服务器返回了网页而非文件(疑似代理错误页)')
+  }
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    res.on('data', (c) => chunks.push(c))
+    res.on('end', () => resolve(Buffer.concat(chunks)))
+    res.on('error', reject)
+  })
 }
+
+// 大文件：流式写盘，边下边算 SHA-256
+function downloadToFile(url, destPath, { expectedSize, onProgress, timeoutMs = 120_000 }) {
+  return new Promise((resolve, reject) => {
+    httpGet(url, { timeoutMs }).then((res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume()
+        return downloadToFile(res.headers.location, destPath, { expectedSize, onProgress, timeoutMs }).then(resolve, reject)
+      }
+      if (res.statusCode !== 200) {
+        res.resume()
+        return reject(new Error(`HTTP ${res.statusCode}`))
+      }
+      const ct = (res.headers['content-type'] || '').toLowerCase()
+      if (ct.includes('text/html')) {
+        res.resume()
+        return reject(new Error('服务器返回了网页而非文件(疑似代理错误页)'))
+      }
+      const len = Number(res.headers['content-length'] || 0)
+      if (expectedSize && len && expectedSize > 0 && len !== expectedSize) {
+        res.resume()
+        return reject(new Error(`文件长度不符(期望${expectedSize}，实际${len})`))
+      }
+      const hash = crypto.createHash('sha256')
+      let received = 0
+      const out = fs.createWriteStream(destPath)
+      res.on('data', (c) => {
+        hash.update(c)
+        received += c.length
+        if (onProgress) onProgress(received)
+      })
+      res.on('error', (e) => { out.destroy(); reject(e) })
+      out.on('error', reject)
+      res.pipe(out)
+      out.on('finish', () => resolve({ bytes: received, sha: hash.digest('hex') }))
+    }, reject)
+  })
+}
+
+// 多源竞态（带校验，校验通过才算该源成功）：先原始 URL，再镜像，逐个尝试
+async function fetchBufferWithFallback(sources, validate) {
+  const errors = []
+  for (const url of sources) {
+    try {
+      const buf = await fetchBuffer(url)
+      if (validate && !validate(buf, url)) throw new Error('内容校验未通过(非预期响应)')
+      return { url, buf }
+    } catch (err) {
+      errors.push(`${url}: ${err.message}`)
+    }
+  }
+  throw new Error('所有更新源均不可用。' + errors.join(' | '))
+}
+
+// 多源流式下载到文件，校验 大小/SHA-256/PE头，通过才落定正式文件名
+async function downloadFileWithFallback(sources, destPath, { expectedSize, expectedSha, onProgress }) {
+  const errors = []
+  for (const url of sources) {
+    const tmp = destPath + '.' + Math.random().toString(36).slice(2) + '.part'
+    try {
+      const { bytes, sha } = await downloadToFile(url, tmp, { expectedSize, onProgress })
+      // PE 文件头校验（'MZ'）
+      const mz = Buffer.alloc(2)
+      const fd = fs.openSync(tmp, 'r')
+      try { fs.readSync(fd, mz, 0, 2, 0) } finally { fs.closeSync(fd) }
+      if (!bytesArePe(mz)) throw new Error('下载内容不是有效的可执行文件')
+      // SHA-256 校验
+      if (expectedSha && sha !== String(expectedSha).toLowerCase()) {
+        throw new Error(`校验失败(期望 ${expectedSha}，实际 ${sha})`)
+      }
+      fs.renameSync(tmp, destPath)
+      return { url, file: destPath, bytes, sha }
+    } catch (err) {
+      errors.push(`${url}: ${err.message}`)
+      try { fs.unlinkSync(tmp) } catch { /* 忽略 */ }
+    }
+  }
+  throw new Error('所有下载源均失败。' + errors.join(' | '))
+}
+
+// 组装候选源列表（原始 url + 用户镜像 + 内置镜像）
+function buildMirrors(url) {
+  return buildMirrorSources(url, {
+    userMirror: (store.get('update.mirror') || '').trim(),
+    builtinMirrors: MIRRORS,
+  })
+}
+
+// 获取发布清单：dev 测试模式直接读本地项目根目录 versions.json，否则走远程多源
+async function fetchManifest() {
+  if (isUpdaterTest()) {
+    const localPath = path.join(app.getAppPath(), 'versions.json')
+    const txt = fs.readFileSync(localPath, 'utf-8')
+    try {
+      JSON.parse(txt)
+    } catch {
+      throw new Error(`本地 versions.json 不是合法 JSON: ${localPath}`)
+    }
+    return { url: 'local://versions.json', buf: Buffer.from(txt, 'utf-8') }
+  }
+  return fetchBufferWithFallback(buildMirrors(MANIFEST_URL), (b) => {
+    try { return typeof JSON.parse(b.toString('utf-8')) === 'object' } catch { return false }
+  })
+}
+
+// ── 便携版：清单驱动 ──
 
 async function checkForUpdatesPortable() {
   try {
     setUpdateState({ status: 'checking', error: null, checkTime: new Date().toISOString() })
 
-    // 多源自动检测最新版本
-    const apiBuf = await fetchWithFallback(UPDATE_API_URL)
-    let releaseData
+    // 取发布清单（必须是合法 JSON）
+    // dev 测试模式(DSH_UPDATER_TEST=1)：直接读本地项目根目录 versions.json，方便本地改文件联调
+    const { url, buf } = await fetchManifest()
+    let manifest
     try {
-      releaseData = JSON.parse(apiBuf.toString('utf-8'))
+      manifest = JSON.parse(buf.toString('utf-8'))
     } catch {
-      setUpdateState({ status: 'error', error: '无法解析 GitHub API 响应' })
+      setUpdateState({ status: 'error', error: '无法解析更新清单 JSON' })
       return
     }
 
-    const remoteVersion = (releaseData.tag_name || '').replace(/^v/, '')
+    const remoteVersion = normalizeVersion(manifest.version)
     const currentVersion = app.getVersion()
-
-    logEvent('updater.portable.check', { current: currentVersion, remote: remoteVersion })
+    logEvent('updater.portable.check', { current: currentVersion, remote: remoteVersion, via: url })
 
     if (!remoteVersion) {
-      setUpdateState({ status: 'error', error: '无法解析远程版本信息' })
+      setUpdateState({ status: 'error', error: '更新清单缺少版本号' })
       return
     }
-
-    if (remoteVersion === currentVersion) {
-      setUpdateState({ status: 'no-update', version: currentVersion })
-      return
-    }
-
-    // 语义版本比较
     if (!isVersionNewer(remoteVersion, currentVersion)) {
-      setUpdateState({ status: 'no-update', version: currentVersion })
+      setUpdateState({ status: 'no-update', version: currentVersion, checkTime: new Date().toISOString() })
       return
     }
 
-    // 保存 release 数据供下载使用
-    updateState._releaseData = releaseData
+    // 选当前平台想要的资产（优先 portable）
+    const key = platformKey()
+    const platforms = (manifest.platforms && typeof manifest.platforms === 'object') ? manifest.platforms : {}
+    const plat = platforms[key] || platforms['win-x64'] || {}
+    const asset = plat.portable || plat.setup
+    if (!asset || !asset.url) {
+      setUpdateState({ status: 'error', error: `清单中未提供 ${key} 的便携版下载` })
+      return
+    }
 
-    setUpdateState({ status: 'available', version: remoteVersion, error: null })
+    updateState._manifest = manifest
+    updateState._asset = asset
+    setUpdateState({ status: 'available', version: remoteVersion, error: null, size: asset.size || 0 })
   } catch (err) {
     logEvent('updater.portable.check-fail', { err: err.message }, 'error')
     setUpdateState({ status: 'error', error: err.message })
@@ -227,48 +335,48 @@ async function checkForUpdatesPortable() {
 }
 
 async function downloadUpdatePortable() {
+  const version = normalizeVersion(updateState.version)
+  const asset = updateState._asset
+  if (!asset) {
+    setUpdateState({ status: 'error', error: '没有可用的下载信息，请先检查更新' })
+    return
+  }
+
   try {
-    const version = updateState.version
-    const releaseData = updateState._releaseData
-    if (!version) {
-      setUpdateState({ status: 'error', error: '没有可用的更新版本' })
+    setUpdateState({ status: 'downloading', progress: 0 })
+
+    let url = asset.url
+    if (!url) {
+      url = `${UPDATE_FEED_URL}/releases/download/v${version}/${encodeURI(`DeepSeek Harness Desktop Simple ${version}.exe`)}`
+    }
+    const fileName = basename(new URL(url).pathname) || `DeepSeek Harness Desktop Simple ${version}.exe`
+    const destPath = path.join(require('node:os').tmpdir(), fileName)
+    const expectedSize = asset.size || 0
+    const expectedSha = (asset.sha256 || '').toLowerCase()
+
+    logEvent('updater.portable.download-start', { url, fileName, size: expectedSize })
+
+    // 校验阶段先预置状态（进度仍可继续显示）
+    const { file, bytes, sha } = await downloadFileWithFallback(buildMirrors(url), destPath, {
+      expectedSize,
+      expectedSha,
+      onProgress: (received) => {
+        const pct = expectedSize ? Math.min(100, Math.round((received / expectedSize) * 100)) : 0
+        setUpdateState({ progress: pct })
+      },
+    })
+
+    setUpdateState({ status: 'verifying', progress: 100 })
+
+    // 兜底 SHA-256（downloadFileWithFallback 内已校验，这里再做一次全量独立校验）
+    const actual = await sha256File(file)
+    if (expectedSha && actual !== expectedSha) {
+      setUpdateState({ status: 'error', error: `校验失败，文件可能损坏或已被篡改(期望 ${expectedSha}，实际 ${actual})`, progress: 0 })
       return
     }
 
-    setUpdateState({ status: 'downloading', progress: 0 })
-
-    // 从 release assets 中找到便携版 .exe（不含 "Setup" 的 .exe）
-    const assets = releaseData && releaseData.assets ? releaseData.assets : []
-    let downloadUrl = null
-    let fileName = null
-
-    for (const asset of assets) {
-      const name = asset.browser_download_url || ''
-      if (name.endsWith('.exe') && !name.includes('Setup')) {
-        downloadUrl = asset.browser_download_url
-        fileName = asset.name
-        break
-      }
-    }
-
-    if (!downloadUrl) {
-      // 回退：使用标准命名格式
-      fileName = `DeepSeek Harness Desktop Simple ${version}.exe`
-      downloadUrl = `${UPDATE_FEED_URL}/releases/download/v${version}/${encodeURI(fileName)}`
-    }
-
-    // 多源自动检测下载
-    logEvent('updater.portable.download-start', { url: downloadUrl, fileName })
-
-    // 下载到临时目录
-    const tmpDir = require('node:os').tmpdir()
-    const destPath = path.join(tmpDir, fileName)
-
-    const buf = await fetchWithFallback(downloadUrl)
-    fs.writeFileSync(destPath, buf)
-
-    logEvent('updater.portable.downloaded', { path: destPath, size: buf.length })
-    setUpdateState({ status: 'downloaded', downloadedFile: destPath, progress: 100 })
+    logEvent('updater.portable.downloaded', { path: file, size: bytes })
+    setUpdateState({ status: 'downloaded', downloadedFile: file, progress: 100, version })
   } catch (err) {
     logEvent('updater.portable.download-fail', { err: err.message }, 'error')
     setUpdateState({ status: 'error', error: err.message })
@@ -335,6 +443,11 @@ function quitAndInstallPortable() {
   requestQuit()
 }
 
+// ── 手动下载兜底 ──
+
+function getManualUrl() { return RELEASE_PAGE }
+function openManualDownload() { shell.openExternal(getManualUrl()) }
+
 // ── 统一入口 ──
 
 function setupUpdater() {
@@ -345,24 +458,24 @@ function setupUpdater() {
     logEvent('updater.setup.skip', { reason: 'dev mode' })
     return
   }
-
   if (m === 'installer') {
     setupInstallerUpdater()
   }
 }
 
-async function checkForUpdates() {
+async function checkForUpdates({ popup = true } = {}) {
   const m = mode()
-  logEvent('updater.check.start', { mode: m })
+  logEvent('updater.check.start', { mode: m, popup })
 
-  if (m === 'dev') {
+  // dev 模式：默认真跳过；设 DSH_UPDATER_TEST=1 走便携版流程做测试
+  if (m === 'dev' && !isUpdaterTest()) {
     setUpdateState({ status: 'no-update', version: app.getVersion(), checkTime: new Date().toISOString() })
     return
   }
 
   if (m === 'installer') {
     await checkForUpdatesInstaller()
-  } else if (m === 'portable') {
+  } else {
     await checkForUpdatesPortable()
   }
 
@@ -376,8 +489,8 @@ async function checkForUpdates() {
     }
   }
 
-  // 启动时发现新版本，触发回调（弹窗询问用户）
-  if (updateState.status === 'available' && _onStartupUpdateAvailable) {
+  // 仅自动检查时弹"发现新版本"框；手动刷新（设置页）靠面板自身展示
+  if (popup && updateState.status === 'available' && _onStartupUpdateAvailable) {
     _onStartupUpdateAvailable(updateState.version)
   }
 }
@@ -389,31 +502,28 @@ async function downloadUpdate() {
   if (m === 'installer') {
     return downloadUpdateInstaller()
   }
-
-  if (m === 'portable') {
-    return downloadUpdatePortable()
-  }
+  return downloadUpdatePortable()
 }
 
 function quitAndInstall() {
   const m = mode()
   logEvent('updater.quitAndInstall', { mode: m })
 
+  if (m === 'dev') {
+    // 开发模式：不实际替换 exe（避免把 electron.exe 覆盖），仅记录
+    logEvent('updater.quitAndInstall.skip', { reason: 'dev mode，不做真实替换' }, 'warn')
+    return
+  }
   if (m === 'installer') {
     return quitAndInstallInstaller()
   }
-
-  if (m === 'portable') {
-    return quitAndInstallPortable()
-  }
+  return quitAndInstallPortable()
 }
 
 module.exports = {
   setupUpdater,
-  checkForUpdates,
-  downloadUpdate,
-  quitAndInstall,
-  getUpdateState,
-  setUpdateState,
-  onStartupUpdateAvailable,
+  checkForUpdates, downloadUpdate, quitAndInstall,
+  getUpdateState, setUpdateState,
+  onStartupUpdateAvailable, onUpdateStateChange,
+  getManualUrl, openManualDownload,
 }

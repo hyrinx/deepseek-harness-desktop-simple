@@ -91,8 +91,14 @@ contextBridge.exposeInMainWorld('updateAPI', {
   check: () => ipcRenderer.invoke('update:check'),
   download: () => ipcRenderer.invoke('update:download'),
   install: () => ipcRenderer.invoke('update:install'),
+  openManual: () => ipcRenderer.invoke('update:open-manual'),
   getState: () => ipcRenderer.invoke('update:get-state'),
   getAutoCheck: () => ipcRenderer.invoke('update:get-auto-check'),
   setAutoCheck: (enabled) => ipcRenderer.invoke('update:set-auto-check', enabled),
   getSkippedVersion: () => ipcRenderer.invoke('update:get-skipped-version'),
+  onState: (callback) => {
+    const handler = (_event, state) => callback(state)
+    ipcRenderer.on('update:state', handler)
+    return () => ipcRenderer.removeListener('update:state', handler)
+  },
 })

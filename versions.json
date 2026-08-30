@@ -1,0 +1,29 @@
+{
+  "_note": "此为发布清单模板。每次发新版时，把 version 改成实际版本号，并填入各平台安装包的 url/sha256/size。发布后将该文件上传到 Release（或仓库 main 分支），程序会按 URL 取此清单。url 建议用 GitHub Release 直链。",
+  "version": "1.6.0",
+  "minApi": 1,
+  "platforms": {
+    "win-x64": {
+      "portable": {
+        "url": "https://github.com/hyrinx/deepseek-harness-desktop-simple/releases/download/v1.5.0/DeepSeek Harness Desktop Simple.exe",
+        "sha256": "请发布时用 sha256sum 计算后填入",
+        "size": 0,
+        "arch": "x64"
+      },
+      "setup": {
+        "url": "https://github.com/hyrinx/deepseek-harness-desktop-simple/releases/download/v1.5.0/DeepSeek Harness Desktop Simple Setup 1.5.0.exe",
+        "sha256": "请发布时用 sha256sum 计算后填入",
+        "size": 0,
+        "arch": "x64"
+      }
+    },
+    "win-arm64": {
+      "portable": {
+        "url": "",
+        "sha256": "",
+        "size": 0,
+        "arch": "arm64"
+      }
+    }
+  }
+}

@@ -243,7 +243,8 @@ function registerIpcHandlers() {
   // 自动更新
   ipcMain.handle('update:check', async () => {
     const { checkForUpdates, getUpdateState } = require('./updater')
-    await checkForUpdates()
+    // 手动检查不弹"发现新版本"框，由设置页自身展示可更新状态
+    await checkForUpdates({ popup: false })
     return getUpdateState()
   })
 
@@ -256,6 +257,13 @@ function registerIpcHandlers() {
   ipcMain.handle('update:install', async () => {
     const { quitAndInstall } = require('./updater')
     quitAndInstall()
+    return true
+  })
+
+  // 失败/无网时的兜底：打开 release 页面手动下载
+  ipcMain.handle('update:open-manual', async () => {
+    const { openManualDownload } = require('./updater')
+    openManualDownload()
     return true
   })
 

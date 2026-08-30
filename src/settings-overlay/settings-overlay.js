@@ -52,7 +52,7 @@
       autostart: { input: qs('autostartInput'), desc: qs('autostartDesc') },
       env: {
         appStatus: qs('appStatus'), appVersion: qs('appVersion'), appRefresh: qs('appRefreshBtn'),
-        appDownload: qs('appDownloadBtn'), appInstall: qs('appInstallBtn'),
+        appDownload: qs('appDownloadBtn'), appInstall: qs('appInstallBtn'), appManual: qs('appManualBtn'),
         appProgress: qs('appProgress'), appFill: qs('appFill'), appProgressText: qs('appProgressText'),
         nodeStatus: qs('nodeStatus'), nodeVersion: qs('nodeVersion'), nodeRefresh: qs('nodeRefreshBtn'),
         npmStatus: qs('npmStatus'), npmVersion: qs('npmVersion'), npmUpdate: qs('npmUpdateBtn'),

@@ -16,6 +16,7 @@
         if (key === 'app') {
           DOM.env.appDownload.style.display = 'none'
           DOM.env.appInstall.style.display = 'none'
+          DOM.env.appManual.style.display = 'none'
           DOM.env.appProgress.style.display = 'none'
           if (refreshBtn) refreshBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>'
           switch (info.status) {
@@ -32,9 +33,17 @@
               DOM.env.appProgressText.textContent = info.progress + '%'
               if (refreshBtn) refreshBtn.style.display = 'none'
               break
+            case 'verifying':
+              versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
+              statusEl.innerHTML = '<span class="status-dot loading"></span> 正在校验...'
+              DOM.env.appProgress.style.display = 'flex'
+              DOM.env.appFill.style.width = '100%'
+              DOM.env.appProgressText.textContent = '校验中'
+              if (refreshBtn) refreshBtn.style.display = 'none'
+              break
             case 'downloaded':
               versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
-              statusEl.innerHTML = '<span class="status-dot ok"></span> 下载完成，准备安装'
+              statusEl.innerHTML = '<span class="status-dot ok"></span> 已下载并校验通过'
               DOM.env.appInstall.style.display = 'inline-flex'
               if (refreshBtn) refreshBtn.style.display = 'none'
               break
@@ -44,14 +53,15 @@
               break
             case 'error':
               versionEl.textContent = 'v' + info.version
-              statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.latestVersion || '检查失败')
+              statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.error || info.latestVersion || '检查失败')
+              DOM.env.appManual.style.display = 'inline-flex'
               break
             default:
               versionEl.textContent = 'v' + info.version
               statusEl.innerHTML = '<span class="status-dot loading"></span> 准备中...'
               break
           }
-          if (refreshBtn) refreshBtn.disabled = (info.status === 'checking' || info.status === 'downloading' || info.status === 'downloaded')
+          if (refreshBtn) refreshBtn.disabled = (info.status === 'checking' || info.status === 'downloading' || info.status === 'verifying' || info.status === 'downloaded')
           return
         }
         if (key === 'plugin') {
@@ -120,7 +130,7 @@
         else if (key === 'app') p = IPC.updateCheck().then(function (st) { return { status: st.status, latestVersion: st.version, error: st.error, progress: st.progress } })
         return p.then(function (result) {
           state.env[key].checking = false
-          if (key === 'app') { state.env[key].status = result.status; state.env[key].version = (qs('appVersion').textContent || '').replace('v', ''); state.env[key].latestVersion = result.latestVersion || ''; state.env[key].progress = result.progress || 0 }
+          if (key === 'app') { state.env[key].status = result.status; state.env[key].version = (qs('appVersion').textContent || '').replace('v', ''); state.env[key].latestVersion = result.latestVersion || ''; state.env[key].progress = result.progress || 0; state.env[key].error = result.error || '' }
           else if (key === 'plugin') { state.env[key].installed = result.installed; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
           else { state.env[key].ok = result.ok; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
           Env.renderOne(key); Env.updateAllState()

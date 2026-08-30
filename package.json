@@ -5,6 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test:updater": "node scripts/update-logic-test.js",
     "build:win": "set NODE_OPTIONS=--use-system-ca && electron-builder --win --publish never",
     "build:linux": "set NODE_OPTIONS=--use-system-ca && electron-builder --linux --publish never",
     "build:mac": "set NODE_OPTIONS=--use-system-ca && electron-builder --mac --publish never"
@@ -15,7 +16,8 @@
     "files": [
       "main.js",
       "assets/**",
-      "src/**"
+      "src/**",
+      "versions.json"
     ],
     "asar": true,
     "directories": {
