@@ -8,8 +8,7 @@ const { state, logEvent, bootMark } = require('./state')
 const {
   APP_NAME, ICON_PATH,
   MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
-  INJECT_DRAG_SCRIPT, INJECT_SESSION_HEADER_CSS, INJECT_WINDOW_CONTROLS_SCRIPT,
-  INJECT_MARKET_RESTART_SCRIPT, LOADING_HTML,
+  INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 } = require('./constants')
 
 const PRELOAD_MAIN = join(__dirname, 'preload', 'preload-main.js')
@@ -69,11 +68,21 @@ function buildMainWindowOptions() {
   return base
 }
 
+// ── 注入脚本缓存（从 src/inject/ 目录读取，避免内联长字符串）
+const fs = require('node:fs')
+const _injectCache = Object.create(null)
+function getInjectScript(name) {
+  if (_injectCache[name]) return _injectCache[name]
+  const filePath = join(__dirname, 'inject', name + '.js')
+  _injectCache[name] = fs.readFileSync(filePath, 'utf-8')
+  return _injectCache[name]
+}
+
 function injectMainWindowCSS(win) {
   win.webContents.on('did-finish-load', () => {
-    win.webContents.executeJavaScript(INJECT_DRAG_SCRIPT).catch(() => {})
-    win.webContents.executeJavaScript(INJECT_WINDOW_CONTROLS_SCRIPT).catch(() => {})
-    win.webContents.executeJavaScript(INJECT_MARKET_RESTART_SCRIPT).catch(() => {})
+    win.webContents.executeJavaScript(getInjectScript('inject-drag')).catch(() => {})
+    win.webContents.executeJavaScript(getInjectScript('inject-window-controls')).catch(() => {})
+    win.webContents.executeJavaScript(getInjectScript('inject-market-restart')).catch(() => {})
     if (IS_WIN) win.webContents.insertCSS(INJECT_SESSION_HEADER_CSS).catch(() => {})
   })
 }
@@ -187,7 +196,6 @@ async function navigateMainWindow() {
 // JS 中使用 __DSH_SETTINGS_CSS__ / __DSH_SETTINGS_HTML__ 占位符，
 // 注入前替换为实际文件内容。
 
-const fs = require('node:fs')
 let _overlayScript = null
 function getOverlayScript() {
   if (_overlayScript) return _overlayScript
