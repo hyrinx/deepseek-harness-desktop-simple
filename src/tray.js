@@ -22,10 +22,10 @@ const MENU_GAP = 2              // .item gap
 const MENU_SEPARATOR_HEIGHT = 9 // .sep（1px 线 + 上下 margin 各 4）
 const MENU_BORDER = 2           // 上下 border 各 1
 
-// 行序：打开主窗口 / 偏好设置 / 查看日志 / 打开命令行 / 分隔线 / 重启 / 退出（共 6 项 + 1 分隔线）
+// 行序：打开主窗口 / 偏好设置 / 查看日志 / 打开命令行 / 分隔线 / 刷新页面 / 重启 / 退出（共 7 项 + 1 分隔线）
 const MENU_HEIGHT = MENU_PADDING * 2
-  + MENU_ITEM_HEIGHT * 6
-  + MENU_GAP * 6
+  + MENU_ITEM_HEIGHT * 7
+  + MENU_GAP * 7
   + MENU_SEPARATOR_HEIGHT
   + MENU_BORDER
 
@@ -75,6 +75,7 @@ const MENU_HTML = `<!doctype html>
     <div class="item" data-action="logs">查看日志</div>
     <div class="item" data-action="terminal">打开命令行</div>
     <div class="sep"></div>
+    <div class="item" data-action="reload">刷新页面</div>
     <div class="item" data-action="restart">重启</div>
     <div class="item" data-action="quit">退出</div>
   </div>
@@ -144,14 +145,14 @@ function calcMenuBounds(mousePos, menuSize) {
  */
 function createTrayAndMenu(callbacks) {
   logEvent('tray.create.start')
-  const { onShowMain, onSettings, onOpenLogs, onOpenTerminal, onRestart, onQuit } = callbacks
+  const { onShowMain, onSettings, onOpenLogs, onOpenTerminal, onReload, onRestart, onQuit } = callbacks
 
   // ── IPC：菜单项点击 ──
   ipcMain.on('tray-menu-select', (_e, action) => {
     logEvent('ipc.tray-menu-select', { action })
     hideMenuWindow()
     const fn = { show: onShowMain, settings: onSettings,
-      logs: onOpenLogs, terminal: onOpenTerminal, restart: onRestart, quit: onQuit }[action]
+      logs: onOpenLogs, terminal: onOpenTerminal, reload: onReload, restart: onRestart, quit: onQuit }[action]
     if (!fn) return
     try {
       const r = fn()

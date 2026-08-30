@@ -231,6 +231,13 @@ async function bootstrap() {
       onSettings: showSettingsOverlay,
       onOpenLogs: openLogFile,
       onOpenTerminal: openTerminal,
+      onReload: () => {
+        if (state.mainWindow && !state.mainWindow.isDestroyed()) {
+          state.mainWindow.webContents.reload()
+          state.mainWindow.show()
+          state.mainWindow.focus()
+        }
+      },
       onRestart: requestRestart,
       onQuit: requestQuit,
     })
