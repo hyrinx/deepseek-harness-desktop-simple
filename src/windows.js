@@ -200,6 +200,9 @@ function getOverlayScript() {
 }
 
 function showSettingsOverlay() {
+  // 先确保主窗口显示
+  showWindow()
+
   const win = state.mainWindow
   if (!win || win.isDestroyed()) {
     logEvent('settings-overlay.show.skip', { reason: win ? 'destroyed' : 'null' }, 'warn')
@@ -237,8 +240,10 @@ function showWindow() {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) {
     logEvent('showWindow.recreate.mainWindow', { hasHostOrigin: Boolean(state.hostOrigin) })
     if (state.hostOrigin) {
-      try { createMainWindow() }
-      catch (e) {
+      try {
+        createMainWindow()
+        navigateMainWindow()
+      } catch (e) {
         logEvent('showWindow.recreate.fail', { err: e }, 'error')
         console.error('[main] 重建窗口失败：', e)
       }
