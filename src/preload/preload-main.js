@@ -79,6 +79,10 @@ contextBridge.exposeInMainWorld('settingsOverlay', {
   hide: () => ipcRenderer.invoke('settings:hide-overlay'),
 })
 
+contextBridge.exposeInMainWorld('appAPI', {
+  restartDsh: () => ipcRenderer.invoke('app:restart-dsh'),
+})
+
 contextBridge.exposeInMainWorld('updateAPI', {
   check: () => ipcRenderer.invoke('update:check'),
   download: () => ipcRenderer.invoke('update:download'),

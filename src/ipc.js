@@ -271,6 +271,16 @@ function registerIpcHandlers() {
   ipcMain.handle('update:get-skipped-version', () => {
     return store.get('update.skippedVersion') || ''
   })
+
+  // 重启 dsh web 子进程并重新导航
+  ipcMain.handle('app:restart-dsh', async () => {
+    const { restartHost } = require('./host')
+    const { navigateMainWindow, showSettingsOverlay } = require('./windows')
+    await restartHost()
+    await navigateMainWindow()
+    showSettingsOverlay()
+    return true
+  })
 }
 
 module.exports = { registerIpcHandlers, registerGlobalShortcut }

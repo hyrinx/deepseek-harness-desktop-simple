@@ -156,6 +156,7 @@
       updateGetAutoCheck: function () { try { return window.updateAPI.getAutoCheck() } catch (e) { return true } },
       updateSetAutoCheck: function (enabled) { try { return window.updateAPI.setAutoCheck(enabled) } catch (e) { return false } },
       updateGetSkippedVersion: function () { try { return window.updateAPI.getSkippedVersion() } catch (e) { return '' } },
+      restartDsh: function () { try { return window.appAPI.restartDsh() } catch (e) { Toast.error('重启失败'); return false } },
     }
 
     // ── DOM 引用 ──
@@ -168,7 +169,7 @@
         pnpmStatus: qs('pnpmStatus'), pnpmVersion: qs('pnpmVersion'), pnpmUpdate: qs('pnpmUpdateBtn'),
         dshStatus: qs('dshStatus'), dshVersion: qs('dshVersion'), dshUpdate: qs('dshUpdateBtn'),
         dshPluginBtn: qs('dshPluginBtn'), dshPluginStatus: qs('dshPluginStatus'), dshPluginVersion: qs('dshPluginVersion'),
-        checkAll: qs('checkAllBtn'), updateLog: qs('updateLog'),
+        checkAll: qs('checkAllBtn'), updateLog: qs('updateLog'), restartBtn: qs('restartBtn'),
       },
       setupBanner: qs('setupBanner'),
     }
@@ -621,6 +622,11 @@
       DOM.env.pnpmUpdate.addEventListener('click', function () { Env.updatePnpm() })
       DOM.env.dshUpdate.addEventListener('click', function () { Env.updateDsh() })
       DOM.env.dshPluginBtn.addEventListener('click', function () { Env.updatePlugin() })
+      DOM.env.restartBtn.addEventListener('click', function () {
+        DOM.env.restartBtn.disabled = true
+        DOM.env.restartBtn.textContent = '重启中...'
+        IPC.restartDsh()
+      })
 
       // 更新按钮
       DOM.update.checkBtn.addEventListener('click', function () { Update.check() })

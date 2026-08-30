@@ -164,9 +164,8 @@ function waitForHostReady(child) {
       if (beforeReady) fail(`Host 在就绪前退出（code ${code}, signal ${signal}）`)
       else if (!expected) {
         logEvent('host.exit.unexpected.console', { code, signal }, 'error')
-        // 延迟导入避免循环依赖
-        const { requestQuit } = require('./lifecycle')
-        requestQuit()
+        const { showSettingsOverlay } = require('./windows')
+        showSettingsOverlay()
       }
     })
   })
@@ -191,4 +190,13 @@ function shutdownHost() {
   })
 }
 
-module.exports = { spawnDshWeb, waitForHostReady, shutdownHost }
+async function restartHost() {
+  logEvent('host.restart.start')
+  await shutdownHost()
+  state.host = spawnDshWeb()
+  state.hostOrigin = await waitForHostReady(state.host)
+  logEvent('host.restart.ok', { origin: state.hostOrigin })
+  return state.hostOrigin
+}
+
+module.exports = { spawnDshWeb, waitForHostReady, shutdownHost, restartHost }
