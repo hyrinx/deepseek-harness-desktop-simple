@@ -175,8 +175,8 @@ const INJECT_MARKET_RESTART_SCRIPT = `
       )
 
       // 异步触发 Electron 外壳重启 DSH 子进程并重新导航
-      if (window.appAPI && window.appAPI.restartDsh) {
-        window.appAPI.restartDsh().catch(function(err) {
+      if (window.appAPI && window.appAPI.restartHost) {
+        window.appAPI.restartHost().catch(function(err) {
           console.error('[桌面外壳] DSH 子进程重启失败:', err)
         })
       }

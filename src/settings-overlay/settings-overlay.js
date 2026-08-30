@@ -155,7 +155,7 @@
       updateGetAutoCheck: function () { try { return window.updateAPI.getAutoCheck() } catch (e) { return true } },
       updateSetAutoCheck: function (enabled) { try { return window.updateAPI.setAutoCheck(enabled) } catch (e) { return false } },
       updateGetSkippedVersion: function () { try { return window.updateAPI.getSkippedVersion() } catch (e) { return '' } },
-      restartDsh: function () { try { return window.appAPI.restartDsh() } catch (e) { Toast.error('重启失败'); return false } },
+      restartHost: function () { try { return window.appAPI.restartHost() } catch (e) { Toast.error('重启失败'); return false } },
     }
 
     // ── DOM 引用 ──
@@ -579,7 +579,7 @@
       DOM.env.restartBtn.addEventListener('click', function () {
         DOM.env.restartBtn.disabled = true
         DOM.env.restartBtn.textContent = '重启中...'
-        IPC.restartDsh()
+        IPC.restartHost()
       })
 
       // 更新按钮

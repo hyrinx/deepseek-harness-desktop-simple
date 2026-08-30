@@ -80,7 +80,7 @@ contextBridge.exposeInMainWorld('settingsOverlay', {
 })
 
 contextBridge.exposeInMainWorld('appAPI', {
-  restartDsh: () => ipcRenderer.invoke('app:restart-dsh'),
+  restartHost: () => ipcRenderer.invoke('app:restart-host'),
 })
 
 contextBridge.exposeInMainWorld('updateAPI', {

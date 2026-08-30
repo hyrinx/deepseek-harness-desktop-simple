@@ -264,12 +264,11 @@ function registerIpcHandlers() {
   })
 
   // 重启 dsh web 子进程并重新导航
-  ipcMain.handle('app:restart-dsh', async () => {
+  ipcMain.handle('app:restart-host', async () => {
     const { restartHost } = require('./host')
-    const { navigateMainWindow, showSettingsOverlay } = require('./windows')
+    const { navigateMainWindow } = require('./windows')
     await restartHost()
     await navigateMainWindow()
-    showSettingsOverlay()
     return true
   })
 }
