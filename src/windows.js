@@ -8,7 +8,7 @@ const { state, logEvent, bootMark } = require('./state')
 const {
   APP_NAME, ICON_PATH,
   MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
-  INJECT_SESSION_HEADER_CSS, LOADING_HTML,
+  DEFAULT_SHORTCUT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
 } = require('./constants')
 
 const PRELOAD_MAIN = join(__dirname, 'preload', 'preload-main.js')
@@ -192,20 +192,28 @@ async function navigateMainWindow() {
 }
 
 // ── 设置覆盖层（注入到主窗口，浮在 dsh 网页上方） ──
-// 读取三个独立文件：CSS、HTML、JS 逻辑，注入时拼接。
-// JS 中使用 __DSH_SETTINGS_CSS__ / __DSH_SETTINGS_HTML__ 占位符，
-// 注入前替换为实际文件内容。
+// 模块已拆分到 settings-overlay/ 目录下，按顺序拼接后替换 __DSH_SETTINGS_MODULES__ 占位符。
+// CSS/HTML 使用 __DSH_SETTINGS_CSS__ / __DSH_SETTINGS_HTML__ 占位符。
+
+const SETTINGS_MODULE_ORDER = [
+  'shortcut', 'toast', 'ipc', 'autostart', 'env', 'update', 'events',
+]
 
 let _overlayScript = null
 function getOverlayScript() {
   if (_overlayScript) return _overlayScript
-  const dir = __dirname
-  const css = JSON.stringify(fs.readFileSync(join(dir, 'settings-overlay', 'style.css'), 'utf-8'))
-  const html = JSON.stringify(fs.readFileSync(join(dir, 'settings-overlay', 'settings-overlay.html'), 'utf-8'))
-  const js = fs.readFileSync(join(dir, 'settings-overlay', 'settings-overlay.js'), 'utf-8')
+  const dir = join(__dirname, 'settings-overlay')
+  const css = JSON.stringify(fs.readFileSync(join(dir, 'style.css'), 'utf-8'))
+  const html = JSON.stringify(fs.readFileSync(join(dir, 'settings-overlay.html'), 'utf-8'))
+  const js = fs.readFileSync(join(dir, 'settings-overlay.js'), 'utf-8')
+  const modules = SETTINGS_MODULE_ORDER
+    .map(function (name) { return fs.readFileSync(join(dir, name + '.js'), 'utf-8') })
+    .join('\n')
   _overlayScript = js
     .replace('__DSH_SETTINGS_CSS__', css)
     .replace('__DSH_SETTINGS_HTML__', html)
+    .replace('__DSH_DEFAULT_SHORTCUT__', JSON.stringify(DEFAULT_SHORTCUT))
+    .replace('// __DSH_SETTINGS_MODULES__', modules)
   return _overlayScript
 }
 
