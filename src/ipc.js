@@ -225,6 +225,21 @@ function registerIpcHandlers() {
     else win.maximize()
   })
 
+  // 标题栏图钉按钮：查询当前置顶状态
+  ipcMain.handle('window-is-pinned', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    return win ? win.isAlwaysOnTop() : false
+  })
+
+  // 标题栏图钉按钮：切换窗口置顶
+  ipcMain.handle('window-toggle-pin', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) return
+    const pinned = !win.isAlwaysOnTop()
+    win.setAlwaysOnTop(pinned)
+    return pinned
+  })
+
   // 自动更新
   ipcMain.handle('update:check', async () => {
     const { checkForUpdates, getUpdateState } = require('./updater')

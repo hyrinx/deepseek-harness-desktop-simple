@@ -60,7 +60,7 @@ function configFilePath() { return join(configDirPath(), 'config.json') }
 // Win32 会话头部避让窗口控制按钮区域
 const INJECT_SESSION_HEADER_CSS = `
   [data-slot='conversation.session.header'] > header > div:not([role='tablist']) {
-    padding-right: calc(138px + 20px);
+    padding-right: calc(184px + 20px);
   }`
 
 // 将 HTML 字符串转为 base64 data URL（兼容 sandbox 渲染器）

@@ -32,7 +32,11 @@ contextBridge.exposeInMainWorld('windowControls', {
     const handler = (_event, isMaximized) => callback(isMaximized)
     ipcRenderer.on('window-maximize-change', handler)
     return () => ipcRenderer.removeListener('window-maximize-change', handler)
-  }
+  },
+  togglePin: () => {
+    ipcRenderer.invoke('window-toggle-pin')
+  },
+  isPinned: () => ipcRenderer.invoke('window-is-pinned'),
 })
 
 // 设置覆盖层 API

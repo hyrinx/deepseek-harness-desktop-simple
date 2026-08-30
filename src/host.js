@@ -17,6 +17,7 @@ function spawnDshWeb() {
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
     shell: IS_WIN,
+    windowsVerbatimArguments: true,
     // 非 Windows 下让子进程成为独立进程组组长，使 killHostTree 的
     // process.kill(-pid) 能整组终止（否则 -pid 指向不存在的进程组，会抛 ESRCH）
     detached: !IS_WIN,
