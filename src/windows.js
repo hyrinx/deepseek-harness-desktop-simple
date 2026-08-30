@@ -3,8 +3,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { join } = require('node:path')
-const { BrowserWindow, shell } = require('electron')
+const { BrowserWindow, shell, screen } = require('electron')
 const { state, logEvent, bootMark } = require('./state')
+const { store } = require('./store')
 const {
   APP_NAME, ICON_PATH,
   MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
@@ -135,8 +136,48 @@ function bindMainWindowLifecycle(win) {
     if (!isMainFrame) return
     logEvent('main-window.did-fail-load', { id, errorCode, errorDesc, url: validatedUrl }, 'error')
   })
-  win.webContents.on('unresponsive', () => {
+  win.on('unresponsive', () => {
     logEvent('main-window.unresponsive', { id }, 'warn')
+  })
+}
+
+// ── 窗口位置/尺寸记忆 ──
+
+function restoreWindowBounds(win) {
+  const saved = store.get('ui.windowBounds')
+  if (!saved || !saved.width || !saved.height) return
+  if (saved.x === undefined || saved.y === undefined) return
+  // 校验保存的坐标是否在任一屏幕范围内（防止外接显示器拔掉后窗口不可见）
+  const displays = screen.getAllDisplays()
+  const visible = displays.some(function (d) {
+    return saved.x >= d.bounds.x - 100 && saved.x < d.bounds.x + d.bounds.width - 100 &&
+           saved.y >= d.bounds.y - 100 && saved.y < d.bounds.y + d.bounds.height - 100
+  })
+  if (!visible) {
+    logEvent('main-window.bounds.restore.skip', { reason: 'offscreen', saved })
+    return
+  }
+  logEvent('main-window.bounds.restore', saved)
+  win.setBounds(saved)
+}
+
+function bindWindowBoundsSave(win) {
+  let saveTimer = null
+  function save() {
+    if (win.isDestroyed() || win.isMaximized() || win.isMinimized()) return
+    const bounds = win.getBounds()
+    store.set('ui.windowBounds', { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height })
+  }
+  function debouncedSave() {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(save, 300)
+  }
+  win.on('resize', debouncedSave)
+  win.on('move', debouncedSave)
+  // 退出时立即保存，不等 debounce
+  win.on('close', function () {
+    clearTimeout(saveTimer)
+    save()
   })
 }
 
@@ -148,6 +189,8 @@ function createMainWindow(options = {}) {
   state.mainWindow = win
 
   bindMainWindowLifecycle(win)
+  bindWindowBoundsSave(win)
+  restoreWindowBounds(win)
 
   if (!state.isQuitting && !silent) {
     win.once('ready-to-show', () => {
