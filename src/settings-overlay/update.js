@@ -2,6 +2,8 @@
     DOM.update = {
       autoCheckInput: qs('updateAutoCheckInput'), autoCheckDesc: qs('updateAutoCheckDesc'),
       skippedVersion: qs('updateSkippedVersion'),
+      mirrorInput: qs('mirrorInput'), mirrorSaveBtn: qs('mirrorSaveBtn'),
+      mirrorResetBtn: qs('mirrorResetBtn'), mirrorHint: qs('mirrorHint'),
     }
 
     // ── 自动更新模块（下载/安装/自动检查设置）──
@@ -71,5 +73,30 @@
             Toast.info('已关闭自动检查更新')
           }
         })
+      },
+      // 加载镜像列表到文本框
+      loadMirrors: function () {
+        return window.updateAPI.getMirrors().then(function (mirrors) {
+          DOM.update.mirrorInput.value = Array.isArray(mirrors) ? mirrors.join('\n') : ''
+          Update.refreshMirrorHint()
+        })
+      },
+      refreshMirrorHint: function () {
+        const lines = DOM.update.mirrorInput.value.split('\n').filter(function (l) { return l.trim() })
+        DOM.update.mirrorHint.textContent = lines.length ? '已配置 ' + lines.length + ' 个镜像源' : '使用内置默认镜像（ghproxy.net / gh-proxy.com / gh.api.99988866.xyz）'
+      },
+      saveMirrors: function () {
+        const lines = DOM.update.mirrorInput.value.split('\n').map(function (l) { return l.trim() }).filter(function (l) { return l })
+        window.updateAPI.setMirrors(lines).then(function () {
+          Toast.success('镜像源已保存')
+          Update.refreshMirrorHint()
+        }).catch(function () { Toast.error('保存失败') })
+      },
+      resetMirrors: function () {
+        DOM.update.mirrorInput.value = ''
+        window.updateAPI.setMirrors([]).then(function () {
+          Toast.success('已恢复为内置默认镜像')
+          Update.refreshMirrorHint()
+        }).catch(function () { Toast.error('重置失败') })
       },
     }

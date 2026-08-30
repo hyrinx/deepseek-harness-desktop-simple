@@ -55,6 +55,8 @@
       DOM.env.appDownload.addEventListener('click', function () { Update.download() })
       DOM.env.appInstall.addEventListener('click', function () { Update.install() })
       DOM.env.appManual.addEventListener('click', function () { Update.manual() })
+      DOM.update.mirrorSaveBtn.addEventListener('click', function () { Update.saveMirrors() })
+      DOM.update.mirrorResetBtn.addEventListener('click', function () { Update.resetMirrors() })
       DOM.update.autoCheckInput.addEventListener('change', function () { Update.toggleAutoCheck() })
     }
 
@@ -65,7 +67,7 @@
     bindEvents()
     Update.subscribe()
 
-    Promise.all([IPC.getSettings(), IPC.fillAboutInfo(), AutoStart.load(), Env.checkAll(), Update.loadAutoCheck()]).then(function (r) {
+    Promise.all([IPC.getSettings(), IPC.fillAboutInfo(), AutoStart.load(), Env.checkAll(), Update.loadAutoCheck(), Update.loadMirrors()]).then(function (r) {
       const settings = r[0]
       const saved = settings && settings.shortcuts && settings.shortcuts.toggleWindow
       if (saved !== undefined && saved !== null) { state.recorder.shortcut = saved; state.recorder.draft = saved }

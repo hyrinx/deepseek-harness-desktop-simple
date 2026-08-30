@@ -52,7 +52,7 @@ function createJsonStore(defaults) {
 const store = createJsonStore({
   shortcuts: { toggleWindow: DEFAULT_SHORTCUT },
   ui: { autoStart: false },
-  update: { autoCheck: true, skippedVersion: '' },
+  update: { autoCheck: true, skippedVersion: '', mirrors: [] },
 })
 
 module.exports = { store }

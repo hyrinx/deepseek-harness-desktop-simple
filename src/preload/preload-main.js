@@ -96,6 +96,8 @@ contextBridge.exposeInMainWorld('updateAPI', {
   getAutoCheck: () => ipcRenderer.invoke('update:get-auto-check'),
   setAutoCheck: (enabled) => ipcRenderer.invoke('update:set-auto-check', enabled),
   getSkippedVersion: () => ipcRenderer.invoke('update:get-skipped-version'),
+  getMirrors: () => ipcRenderer.invoke('update:get-mirrors'),
+  setMirrors: (mirrors) => ipcRenderer.invoke('update:set-mirrors', mirrors),
   onState: (callback) => {
     const handler = (_event, state) => callback(state)
     ipcRenderer.on('update:state', handler)

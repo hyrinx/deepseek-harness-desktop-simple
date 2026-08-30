@@ -32,9 +32,10 @@ const RELEASE_PAGE = `${UPDATE_FEED_URL}/releases/latest`
 // 发布清单：优先读 main 分支根目录 versions.json（直连 + 镜像）
 const MANIFEST_URL = `https://raw.githubusercontent.com/${UPDATE_REPO}/main/versions.json`
 
-// 内置镜像源（备用，可被用户自定义镜像覆盖/补充）
-const MIRRORS = [
-  'https://ghproxy.com/',
+// 内置镜像源（默认兜底，可被用户配置 mirrors 覆盖/补充）
+const BUILTIN_MIRRORS = [
+  'https://ghproxy.net/',
+  'https://gh-proxy.com/',
   'https://gh.api.99988866.xyz/',
 ]
 
@@ -261,10 +262,21 @@ async function downloadFileWithFallback(sources, destPath, { expectedSize, expec
 }
 
 // 组装候选源列表（原始 url + 用户镜像 + 内置镜像）
+// 用户镜像：config.json 的 update.mirrors 数组，每行一个 URL
+// 内置镜像：兜底，用户未配置时使用
+function getMirrors() {
+  const userMirrors = store.get('update.mirrors', [])
+  if (Array.isArray(userMirrors) && userMirrors.length > 0) {
+    return userMirrors.filter((m) => typeof m === 'string' && m.trim()).map((m) => m.trim())
+  }
+  return BUILTIN_MIRRORS
+}
+
 function buildMirrors(url) {
+  const allMirrors = getMirrors()
   return buildMirrorSources(url, {
-    userMirror: (store.get('update.mirror') || '').trim(),
-    builtinMirrors: MIRRORS,
+    userMirror: '',  // 不再使用单值 mirror，走 mirrors 数组
+    builtinMirrors: allMirrors,
   })
 }
 
@@ -395,52 +407,65 @@ function quitAndInstallPortable() {
 
   logEvent('updater.portable.install', { current: currentExe, new: newExe })
 
-  if (IS_WIN) {
-    // 创建批处理替换脚本：等待原进程退出 → 替换 exe → 重启新版本
-    const batPath = path.join(require('node:os').tmpdir(), 'dsh_update.bat')
-    const bat = [
-      '@echo off',
-      'chcp 65001 >nul',
-      'echo 正在更新 DeepSeek Harness Desktop...',
-      ':wait',
-      `tasklist /fi "PID eq ${process.pid}" 2>nul | find "${process.pid}" >nul`,
-      'if %errorlevel% equ 0 (',
-      '  timeout /t 1 /nobreak >nul',
-      '  goto wait',
-      ')',
-      `echo 替换文件: ${currentExe}`,
-      `copy /y "${newExe}" "${currentExe}"`,
-      'if %errorlevel% equ 0 (',
-      '  echo 更新完成，正在启动新版本...',
-      `  start "" "${currentExe}"`,
-      '  del "%~f0"',
-      ') else (',
-      '  echo 更新失败，请手动替换文件',
-      '  echo 新文件位于: ' + newExe,
-      '  pause',
-      ')',
-    ].join('\r\n')
-    fs.writeFileSync(batPath, '\uFEFF' + bat, 'utf-8')
-    spawn('cmd', ['/c', batPath], { detached: true, stdio: 'ignore', windowsHide: true })
-  } else {
-    // Linux / macOS：shell 替换脚本
-    const shPath = path.join(require('node:os').tmpdir(), 'dsh_update.sh')
-    const sh = [
-      '#!/bin/bash',
-      `while kill -0 ${process.pid} 2>/dev/null; do sleep 1; done`,
-      `cp -f "${newExe}" "${currentExe}"`,
-      `chmod +x "${currentExe}"`,
-      `"${currentExe}" &`,
-      `rm -f "$0"`,
-    ].join('\n')
-    fs.writeFileSync(shPath, sh, 'utf-8')
-    fs.chmodSync(shPath, 0o755)
-    spawn('sh', [shPath], { detached: true, stdio: 'ignore' })
+  // 启动独立 worker 进程（纯 Node.js，main 退出后继续运行）
+  // 流程：等待 main 退出 → 备份 → 替换 → 启动新版本 → 看门狗 → 回滚或清理
+  const workerPath = path.join(__dirname, 'updater-worker.js')
+  const args = [
+    workerPath,
+    String(process.pid),
+    String(newExe),
+    String(currentExe),
+    '10',  // 看门狗超时秒数
+  ]
+
+  logEvent('updater.portable.worker-spawn', { workerPath, pid: process.pid })
+
+  try {
+    const child = spawn(process.execPath, args, {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    child.unref()
+  } catch (err) {
+    logEvent('updater.portable.worker-spawn-fail', { err: err.message }, 'error')
+    // 兜底：写 bat 脚本
+    fallbackBatInstall(currentExe, newExe)
   }
 
-  // 退出当前进程（使用延迟 require 避免循环依赖）
+  // 退出当前进程
   const { requestQuit } = require('./lifecycle')
   requestQuit()
+}
+
+// 兜底：worker 无法启动时，用传统 bat 脚本
+function fallbackBatInstall(currentExe, newExe) {
+  if (!IS_WIN) return
+  const batPath = path.join(require('node:os').tmpdir(), 'dsh_update.bat')
+  const bat = [
+    '@echo off',
+    'chcp 65001 >nul',
+    'echo 正在更新 DeepSeek Harness Desktop...',
+    ':wait',
+    `tasklist /fi "PID eq ${process.pid}" 2>nul | find "${process.pid}" >nul`,
+    'if %errorlevel% equ 0 (',
+    '  timeout /t 1 /nobreak >nul',
+    '  goto wait',
+    ')',
+    `echo 替换文件: ${currentExe}`,
+    `copy /y "${newExe}" "${currentExe}"`,
+    'if %errorlevel% equ 0 (',
+    '  echo 更新完成，正在启动新版本...',
+    `  start "" "${currentExe}"`,
+    '  del "%~f0"',
+    ') else (',
+    '  echo 更新失败，请手动替换文件',
+    '  echo 新文件位于: ' + newExe,
+    '  pause',
+    ')',
+  ].join('\r\n')
+  fs.writeFileSync(batPath, '\uFEFF' + bat, 'utf-8')
+  spawn('cmd', ['/c', batPath], { detached: true, stdio: 'ignore', windowsHide: true })
 }
 
 // ── 手动下载兜底 ──
@@ -526,4 +551,5 @@ module.exports = {
   getUpdateState, setUpdateState,
   onStartupUpdateAvailable, onUpdateStateChange,
   getManualUrl, openManualDownload,
+  getMirrors,
 }

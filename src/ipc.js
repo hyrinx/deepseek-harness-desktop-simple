@@ -286,6 +286,20 @@ function registerIpcHandlers() {
     return store.get('update.skippedVersion') || ''
   })
 
+  // 镜像源管理
+  ipcMain.handle('update:get-mirrors', () => {
+    const { getMirrors } = require('./updater')
+    return getMirrors()
+  })
+
+  ipcMain.handle('update:set-mirrors', (_e, mirrors) => {
+    if (!Array.isArray(mirrors)) return false
+    const cleaned = mirrors.filter((m) => typeof m === 'string' && m.trim()).map((m) => m.trim())
+    store.set('update.mirrors', cleaned)
+    logEvent('updater.mirrors.set', { count: cleaned.length })
+    return true
+  })
+
   // 重启 dsh web 子进程并重新导航
   ipcMain.handle('app:restart-host', async () => {
     const { restartHost } = require('./host')

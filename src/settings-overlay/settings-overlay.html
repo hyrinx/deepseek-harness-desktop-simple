@@ -196,6 +196,20 @@
           </div>
         </div>
         <div class="card">
+          <div class="card-title"><span class="icon-dot"></span>下载镜像源</div>
+          <div class="card-body">
+            <div class="setting-desc" style="margin-bottom:8px;">GitHub 下载加速镜像，每行一个地址。留空则使用内置默认镜像。</div>
+            <textarea class="mirror-input" id="dsh-so-mirrorInput" rows="4" placeholder="https://ghproxy.net/
+https://gh-proxy.com/
+https://gh.api.99988866.xyz/"></textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;">
+              <button class="btn btn-sm btn-primary" id="dsh-so-mirrorSaveBtn">保存</button>
+              <button class="btn btn-sm" id="dsh-so-mirrorResetBtn">恢复默认</button>
+            </div>
+            <div class="setting-desc" style="margin-top:6px;color:var(--gray-700);" id="dsh-so-mirrorHint"></div>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-title"><span class="icon-dot"></span>快捷键</div>
           <div class="card-body">
             <div class="shortcut-row">
@@ -225,7 +239,7 @@
           <div class="card-body">
             <ul class="about-list">
               <li><span class="about-label">应用名称</span><span class="about-value">DeepSeek Harness Simple</span></li>
-              <li><span class="about-label">版本</span><span class="about-value"><code id="dsh-so-appVersion">0.1.0</code></span></li>
+              <li><span class="about-label">版本</span><span class="about-value"><code id="dsh-so-aboutAppVersion">0.1.0</code></span></li>
               <li><span class="about-label">平台</span><span class="about-value"><code id="dsh-so-appPlatform">-</code></span></li>
               <li><span class="about-label">说明</span><span class="about-value">DeepSeek 轻量桌面包装，基于 Electron</span></li>
               <li><span class="about-label">GitHub</span><span class="about-value"><a class="about-link" href="https://github.com/hyrinx/deepseek-harness-desktop-simple" target="_blank">github.com/hyrinx/deepseek-harness-desktop-simple</a></span></li>

@@ -5,12 +5,12 @@
       getAutoStart: function () { try { return window.settingsAPI.getAutoStart() } catch (e) { return { enabled: false, available: false, actuallySet: false } } },
       setAutoStart: function (enabled) { try { return window.settingsAPI.setAutoStart(enabled) } catch (e) { Toast.error('设置失败'); return null } },
       fillAboutInfo: function () {
-        Promise.all([
+        return Promise.all([
           window.settingsAPI.getPlatform().catch(function () { return '-' }),
           window.settingsAPI.getVersion().catch(function () { return '0.1.0' }),
         ]).then(function (r) {
           qs('appPlatform').textContent = r[0]
-          qs('appVersion').textContent = r[1]
+          qs('aboutAppVersion').textContent = 'v' + r[1]
         })
       },
       checkNode: function () { try { return window.envAPI.checkNode() } catch (e) { return { ok: false, error: String(e), version: '' } } },
@@ -31,5 +31,6 @@
       updateGetAutoCheck: function () { try { return window.updateAPI.getAutoCheck() } catch (e) { return true } },
       updateSetAutoCheck: function (enabled) { try { return window.updateAPI.setAutoCheck(enabled) } catch (e) { return false } },
       updateGetSkippedVersion: function () { try { return window.updateAPI.getSkippedVersion() } catch (e) { return '' } },
+      getAppVersion: function () { try { return window.settingsAPI.getVersion() } catch (e) { return '0.0.0' } },
       restartHost: function () { try { return window.appAPI.restartHost() } catch (e) { Toast.error('重启失败'); return false } },
     }

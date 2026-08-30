@@ -127,10 +127,10 @@
         else if (key === 'pnpm') p = IPC.checkPnpm()
         else if (key === 'dsh') p = IPC.checkDsh()
         else if (key === 'plugin') p = IPC.checkPlugin()
-        else if (key === 'app') p = IPC.updateCheck().then(function (st) { return { status: st.status, latestVersion: st.version, error: st.error, progress: st.progress } })
+        else if (key === 'app') p = Promise.all([IPC.updateCheck(), IPC.getAppVersion()]).then(function (r) { return { status: r[0].status, latestVersion: r[0].version, error: r[0].error, progress: r[0].progress, currentVersion: r[1] } })
         return p.then(function (result) {
           state.env[key].checking = false
-          if (key === 'app') { state.env[key].status = result.status; state.env[key].version = (qs('appVersion').textContent || '').replace('v', ''); state.env[key].latestVersion = result.latestVersion || ''; state.env[key].progress = result.progress || 0; state.env[key].error = result.error || '' }
+          if (key === 'app') { state.env[key].status = result.status; state.env[key].version = result.currentVersion; state.env[key].latestVersion = result.latestVersion || ''; state.env[key].progress = result.progress || 0; state.env[key].error = result.error || '' }
           else if (key === 'plugin') { state.env[key].installed = result.installed; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
           else { state.env[key].ok = result.ok; state.env[key].version = result.version || ''; state.env[key].latestVersion = result.latestVersion || '' }
           Env.renderOne(key); Env.updateAllState()
