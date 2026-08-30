@@ -184,7 +184,6 @@ function createTrayAndMenu(callbacks) {
     showMenuWindow()
   })
 
-  tray.on('double-click', () => logEvent('tray.double-click'))
   tray.on('destroy', () => logEvent('tray.destroy', { isQuitting: state.isQuitting }, state.isQuitting ? 'info' : 'warn'))
   tray.on('balloon-show', () => logEvent('tray.balloon-show'))
   tray.on('balloon-click', () => logEvent('tray.balloon-click'))
