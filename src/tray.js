@@ -279,7 +279,7 @@ function createTrayAndMenu(callbacks) {
     const win = getOrCreateMenuWindow()
     const mousePos = screen.getCursorScreenPoint()
 
-    if (menuReady) {
+    if (menuReady && !win.isDestroyed()) {
       const bounds = calcMenuBounds(mousePos, menuSize)
       logEvent('menu-window.position', { mousePos, bounds })
       win.setBounds(bounds)

@@ -192,16 +192,15 @@ function createMainWindow(options = {}) {
   bindWindowBoundsSave(win)
   restoreWindowBounds(win)
 
-  if (!state.isQuitting && !silent) {
-    win.once('ready-to-show', () => {
+  bootMark('load loading page')
+  win.loadURL(LOADING_HTML).then(() => {
+    if (!state.isQuitting && !silent) {
       win.show()
       bootMark('show window (loading)')
-    })
-  }
-
-  bootMark('load loading page')
-  win.loadURL(LOADING_HTML).catch((err) => {
+    }
+  }).catch((err) => {
     logEvent('main-window.load-loading.fail', { id: win.id, err }, 'error')
+    if (!state.isQuitting && !silent) win.show()
   })
   return win
 }
