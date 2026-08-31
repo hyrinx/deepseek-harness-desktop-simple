@@ -1,15 +1,12 @@
 name: Release
 
 on:
+  # 推送 main/master 即触发:自动读取 package.json 版本号并构建发布
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+      - master
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: '版本号（如 v1.2.0）'
-        required: true
-        type: string
 
 jobs:
   build:
@@ -40,7 +37,7 @@ jobs:
 
       - name: 构建 (${{ matrix.os }})
         # 显式 --publish never:禁止 electron-builder 隐性上传 Release
-        # (否则会用只读的 GITHUB_TOKEN 写 Releases API 触发 403),发布交由下方 action-gh-release
+        # (否则会用只读的 GITHUB_TOKEN 写 Releases API 触发 403),发布交由 gh release create
         run: npx electron-builder ${{ matrix.build_flag }} --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,33 +61,49 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
         with:
-          # 关键:显式检出目标 tag(wf_dispatch 下默认 ref 是 main,会导致 git log 对比区间塌缩成空)
-          ref: ${{ inputs.tag_name || github.ref }}
-          # 需要完整历史与 tag：用于按“上一个 tag”区间自动生成发布说明
+          # 需要完整历史与 tag:用于按“上一个 tag”区间自动生成发布说明
           fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
           path: dist
 
+      - name: 识别版本号并判断是否已发布
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          V="$(node -p "require('./package.json').version")"
+          TAG="v$V"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # 幂等:远程已存在同名 Release(即该版本已发布)则跳过,避免重复发布
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            echo "::notice::版本 $TAG 已发布,跳过本次发布"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 列出产物
         run: ls -R dist/
 
       - name: 生成发布说明(更新内容)
+        if: steps.meta.outputs.skip == 'false'
         id: notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          TAG="${{ inputs.tag_name || github.ref_name }}"
+          TAG="${{ steps.meta.outputs.tag }}"
           # 上一版本 tag(完整历史由 checkout 的 fetch-depth: 0 提供),用于生成分类更新记录
           PREV="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
 
-          # 依 conventional commit 前缀,把自上一版本以来的提交归类到各分类区块;
-          # 标题已体现分类,归类时去掉 "feat:/fix:..." 等前缀
+          # 依 conventional commit 前缀,把自上一版本以来的提交归类到各分类区块
           FEAT=(); FIX=(); OPT=(); OTH=()
           if [ -n "$PREV" ]; then
             while IFS= read -r subj; do
@@ -100,10 +113,9 @@ jobs:
                 refactor:*|perf:*|style:*|docs:*|chore:*|ci:*|test:*|build:*|release:*) OPT+=("${subj#*: }") ;;
                 *)                            OTH+=("$subj") ;;
               esac
-            done < <(git log --pretty=format:%s "$PREV..$TAG")
+            done < <(git log --pretty=format:%s "$PREV..HEAD")
           fi
 
-          # 组装分类正文(空分类自动跳过)
           NOTES_FILE="$(mktemp)"
           emit() { local title="$1"; shift; local -a arr=("$@"); [ ${#arr[@]} -eq 0 ] && return; printf '\n### %s\n' "$title" >> "$NOTES_FILE"; local i; for i in "${arr[@]}"; do printf '* %s\n' "$i" >> "$NOTES_FILE"; done; }
           emit "✨ 新增" "${FEAT[@]}"
@@ -114,56 +126,44 @@ jobs:
           rm -f "$NOTES_FILE"
           [ -z "$NOTES" ] && NOTES="此版本暂无变更记录"
 
-          # 先仅写更新内容;安装包下载表待 Release 创建并上传资产后,
-          # 按 GitHub 真实托管的资产名生成(避免空格被转点号导致下载链接 404)
           {
             echo "## 📝 更新内容"
             echo
             echo "$NOTES"
           } > NOTES.md
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: 发布到 GitHub Release (草稿)
-        uses: softprops/action-gh-release@v2
-        with:
-          # 只上传安装包产物,避免把 Electron 内部框架文件(locale.pak/dll/…)也传上去
-          # 参考 upload-artifact 的子目录结构: dist/<平台>/<安装包>
-          files: |
-            dist/*/*.exe
-            dist/*/*.dmg
-            dist/*/*.AppImage
-            dist/*/*.deb
-            dist/*/*.rpm
-            dist/*/*.zip
-            dist/*/*.blockmap
-            dist/*/latest*.yml
-          body_path: NOTES.md
-          tag_name: ${{ steps.notes.outputs.tag }}
-          draft: true
-
-      - name: 校验资产上传
+      - name: 创建 Release 并上传资产
+        if: steps.meta.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          TAG="${{ steps.notes.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          # 直接在服务端按当前提交建 tag+Release(--target $GITHUB_SHA),
+          # 不会再产生未绑定的 untagged Release,下载链接也不会为空
+          gh release create "$TAG" \
+            dist/*/*.exe dist/*/*.dmg dist/*/*.AppImage dist/*/*.deb dist/*/*.rpm \
+            dist/*/*.zip dist/*/*.blockmap dist/*/latest*.yml \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            -F NOTES.md
           # 等待 GitHub API 索引完成,避免竞态
           sleep 5
           ASSET_COUNT=$(gh release view "$TAG" --json assets --jq '.assets | length')
           echo "已上传资产数量: $ASSET_COUNT"
           if [ "$ASSET_COUNT" -eq 0 ]; then
-            echo "::error::未上传任何资产,请检查 action-gh-release 的 files 通配符是否匹配到文件"
+            echo "::error::未上传任何资产,请检查 gh release create 的通配符是否匹配到文件"
             exit 1
           fi
 
-      - name: 生成安装包下载表(按真实资产)
+      - name: 生成安装包下载表(按真实资产)并更新正文
+        if: steps.meta.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          TAG="${{ steps.notes.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
           # 读取 Release 实际托管的资产下载地址,保证下载链接与上传名完全一致
-          # (不直接用本地文件名拼 URL,可规避 GitHub 将文件名空格转点号导致的 404)
           gh release view "$TAG" --json assets \
             --jq '.assets[] | [.name,.browser_download_url] | @tsv' > assets.tsv
 
@@ -214,7 +214,4 @@ jobs:
             cat TABLE.md
           } > RELEASE_BODY.md
 
-      - name: 更新发布正文
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ steps.notes.outputs.tag }}" --notes-file RELEASE_BODY.md
+          gh release edit "$TAG" --notes-file RELEASE_BODY.md
