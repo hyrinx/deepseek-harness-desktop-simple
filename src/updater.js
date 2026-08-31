@@ -2,8 +2,7 @@
 // 自动更新（安装版 electron-updater + 便携版手动下载）
 //
 // 安装版（NSIS）：electron-updater 自动处理，下载安装包 → 静默安装
-// 便携版：手动检查 GitHub API → 下载新 .exe → 替换脚本 → 退出
-// 开发模式：跳过更新检查
+// 便携版 / 开发模式：手动检查 GitHub API → 下载新 .exe → 替换脚本 → 退出
 //
 // 多源检测：内置多个 GitHub 加速镜像，自动依次尝试，无需用户配置
 // ═══════════════════════════════════════════════════════════════
@@ -341,11 +340,6 @@ function setupUpdater() {
   const m = mode()
   logEvent('updater.setup', { mode: m })
 
-  if (m === 'dev') {
-    logEvent('updater.setup.skip', { reason: 'dev mode' })
-    return
-  }
-
   if (m === 'installer') {
     setupInstallerUpdater()
   }
@@ -355,14 +349,9 @@ async function checkForUpdates() {
   const m = mode()
   logEvent('updater.check.start', { mode: m })
 
-  if (m === 'dev') {
-    setUpdateState({ status: 'no-update', version: app.getVersion(), checkTime: new Date().toISOString() })
-    return
-  }
-
   if (m === 'installer') {
     await checkForUpdatesInstaller()
-  } else if (m === 'portable') {
+  } else {
     await checkForUpdatesPortable()
   }
 
@@ -390,9 +379,7 @@ async function downloadUpdate() {
     return downloadUpdateInstaller()
   }
 
-  if (m === 'portable') {
-    return downloadUpdatePortable()
-  }
+  return downloadUpdatePortable()
 }
 
 function quitAndInstall() {
@@ -403,9 +390,7 @@ function quitAndInstall() {
     return quitAndInstallInstaller()
   }
 
-  if (m === 'portable') {
-    return quitAndInstallPortable()
-  }
+  return quitAndInstallPortable()
 }
 
 module.exports = {
