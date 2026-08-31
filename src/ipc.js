@@ -9,6 +9,7 @@ const { store } = require('./store')
 const { logDirPath } = require('./constants')
 const { applyAutoStart, readAutoStart } = require('./autostart')
 const { registerEnvHandlers } = require('./env')
+const { registerNodeJsHandlers } = require('./nodejs-bootstrap')
 
 // ── 全局快捷键 ──
 
@@ -135,6 +136,7 @@ function registerIpcHandlers() {
 
   // 环境检测与更新（委托 env.js）
   registerEnvHandlers(ipcMain)
+  registerNodeJsHandlers(ipcMain)
 
   // 设置向导标记（首次启动后置为 done）
   ipcMain.handle('setup:mark-done', () => {

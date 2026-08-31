@@ -129,7 +129,7 @@
       },
       checkAll: function () {
         state.env.globalChecking = true; this.updateAllState()
-        return Promise.all([this.checkOne('node'), this.checkOne('npm'), this.checkOne('pnpm'), this.checkOne('dsh'), this.checkOne('plugin'), this.checkOne('app')]).then(function () {
+        return Promise.all([this.checkOne('node'), this.checkOne('npm'), this.checkOne('pnpm'), this.checkOne('dsh'), this.checkOne('plugin'), this.checkOne('app'), this.checkNodejs()]).then(function () {
           state.env.globalChecking = false; Env.updateAllState()
         })
       },
@@ -220,5 +220,65 @@
         el.textContent += text
         el.className = 'update-log show' + (cls ? ' ' + cls : '')
         el.scrollTop = el.scrollHeight
+      },
+      // Node.js 安装位置
+      checkNodejs: function () {
+        return IPC.getNodejsStatus().then(function (res) {
+          state.env.nodejs = res
+          Env.renderNodejs()
+          return res
+        })
+      },
+      renderNodejs: function () {
+        const info = state.env.nodejs
+        const row = DOM.env.nodejsPathRow
+        if (!row) return
+        row.style.display = ''
+        const valEl = DOM.env.nodejsPathValue
+        const statusEl = DOM.env.nodejsPathStatus
+        const setBtn = DOM.env.nodejsPathSetBtn
+        const dlBtn = DOM.env.nodejsDownloadBtn
+        const progress = DOM.env.nodejsProgress
+
+        if (info.downloading) {
+          setBtn.style.display = 'none'
+          dlBtn.style.display = 'none'
+          progress.style.display = 'flex'
+          DOM.env.nodejsFill.style.width = info.downloadProgress + '%'
+          DOM.env.nodejsProgressText.textContent = info.downloadProgress + '%'
+          statusEl.innerHTML = '<span class="status-dot loading"></span> ' + (info.downloadMessage || '下载中...')
+          return
+        }
+        progress.style.display = 'none'
+
+        if (info.globalAvailable) {
+          valEl.textContent = info.globalPath || '（使用全局 Node.js）'
+          valEl.title = info.globalPath
+          statusEl.innerHTML = '<span class="status-dot ok"></span> 全局 Node.js 已满足'
+          setBtn.style.display = 'none'
+          dlBtn.style.display = 'none'
+        } else if (info.localInstalled) {
+          valEl.textContent = info.localPath || '-'
+          valEl.title = info.localPath
+          statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
+          setBtn.style.display = ''
+          dlBtn.style.display = 'none'
+          setBtn.title = '修改安装路径'
+        } else if (info.pathConfigured) {
+          valEl.textContent = info.localPath || '-'
+          valEl.title = info.localPath
+          statusEl.innerHTML = '<span class="status-dot warn"></span> 路径已设置，待安装'
+          setBtn.style.display = ''
+          dlBtn.style.display = ''
+          dlBtn.disabled = false
+          dlBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>下载'
+          setBtn.title = '修改安装路径'
+        } else {
+          valEl.textContent = '未设置'
+          statusEl.innerHTML = '<span class="status-dot err"></span> 未配置'
+          setBtn.style.display = ''
+          dlBtn.style.display = 'none'
+          setBtn.title = '设置安装路径'
+        }
       },
     }

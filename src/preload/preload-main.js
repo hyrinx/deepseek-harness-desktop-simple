@@ -72,6 +72,16 @@ contextBridge.exposeInMainWorld('envAPI', {
     ipcRenderer.on('env:progress', handler)
     return () => ipcRenderer.removeListener('env:progress', handler)
   },
+  getNodejsStatus: () => ipcRenderer.invoke('nodejs:status'),
+  getNodejsInstallPath: () => ipcRenderer.invoke('nodejs:get-install-path'),
+  setNodejsInstallPath: (path) => ipcRenderer.invoke('nodejs:set-install-path', path),
+  startNodejsDownload: () => ipcRenderer.invoke('nodejs:start-download'),
+  onNodejsProgress: (callback) => {
+    const handler = (_, data) => callback(data)
+    ipcRenderer.on('nodejs:progress', handler)
+    ipcRenderer.send('nodejs:set-progress-callback')
+    return () => ipcRenderer.removeListener('nodejs:progress', handler)
+  },
 })
 
 contextBridge.exposeInMainWorld('setupAPI', {

@@ -82,6 +82,29 @@
                 </button>
               </div>
             </div>
+            <div class="env-row" id="dsh-so-nodejsPathRow" style="display:none;">
+              <div class="env-icon" style="background:linear-gradient(135deg,#539e43 0%,#6cc24a 100%);">📁</div>
+              <div class="env-info">
+                <div class="env-name">Node.js 安装位置</div>
+                <div class="env-status" id="dsh-so-nodejsPathStatus"><span class="status-dot"></span></div>
+              </div>
+              <span class="env-version" id="dsh-so-nodejsPathValue" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">-</span>
+              <div class="env-actions">
+                <button class="btn btn-sm" id="dsh-so-nodejsPathSetBtn" title="设置安装路径">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+                </button>
+                <button class="btn btn-sm btn-primary" id="dsh-so-nodejsDownloadBtn" style="display:none;" title="下载安装 Node.js">
+                  <svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  下载
+                </button>
+              </div>
+            </div>
+            <div class="update-progress" id="dsh-so-nodejsProgress" style="display:none;">
+              <div class="update-progress-bar">
+                <div class="update-progress-fill" id="dsh-so-nodejsFill" style="width:0%;"></div>
+              </div>
+              <span class="update-progress-text" id="dsh-so-nodejsProgressText">0%</span>
+            </div>
             <div class="env-row">
               <div class="env-icon" style="background:linear-gradient(135deg,#cb3837 0%,#e53e3e 100%);">n</div>
               <div class="env-info">

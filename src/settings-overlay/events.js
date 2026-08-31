@@ -41,6 +41,67 @@
 
       DOM.env.checkAll.addEventListener('click', function () { Env.checkAll() })
       DOM.env.nodeRefresh.addEventListener('click', function () { Env.checkOne('node') })
+      DOM.env.nodejsPathSetBtn.addEventListener('click', function () {
+        if (DOM.env.nodejsPathSetBtn.disabled) return
+        DOM.env.nodejsPathSetBtn.disabled = true
+        IPC.getNodejsInstallPath().then(function (res) {
+          var current = res.path || ''
+          var newPath = prompt('请输入 Node.js 安装路径（无中文无空格，如 E:\\nodejs）：', current)
+          DOM.env.nodejsPathSetBtn.disabled = false
+          if (newPath === null) return // 用户取消
+          var trimmed = newPath.trim()
+          if (!trimmed) { Toast.error('路径不能为空'); return }
+          IPC.setNodejsInstallPath(trimmed).then(function (ok) {
+            if (ok) {
+              state.env.nodejs.pathConfigured = true
+              state.env.nodejs.localPath = trimmed
+              Env.renderNodejs()
+              Toast.success('路径已保存')
+            } else {
+              Toast.error('保存失败')
+            }
+          })
+        })
+      })
+      DOM.env.nodejsDownloadBtn.addEventListener('click', function () {
+        if (DOM.env.nodejsDownloadBtn.disabled) return
+        DOM.env.nodejsDownloadBtn.disabled = true
+        DOM.env.nodejsDownloadBtn.textContent = '下载中...'
+        state.env.nodejs.downloading = true
+        state.env.nodejs.downloadProgress = 0
+        state.env.nodejs.downloadMessage = '准备下载...'
+        Env.renderNodejs()
+
+        var stopProgress = IPC.onNodejsProgress(function (data) {
+          state.env.nodejs.downloading = data.stage !== 'done' && data.stage !== 'error'
+          state.env.nodejs.downloadProgress = data.percent || 0
+          state.env.nodejs.downloadMessage = data.message || ''
+          Env.renderNodejs()
+          if (data.stage === 'done') {
+            state.env.nodejs.downloading = false
+            stopProgress()
+            Env.checkNodejs().then(function () {
+              Toast.success('Node.js 安装完成！')
+            })
+          } else if (data.stage === 'error') {
+            state.env.nodejs.downloading = false
+            stopProgress()
+            DOM.env.nodejsDownloadBtn.disabled = false
+            DOM.env.nodejsDownloadBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>下载'
+            Toast.error(data.message || '下载失败')
+          }
+        })
+
+        IPC.startNodejsDownload().then(function (result) {
+          if (!result.installed && result.reason === 'error') {
+            state.env.nodejs.downloading = false
+            DOM.env.nodejsDownloadBtn.disabled = false
+            DOM.env.nodejsDownloadBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>下载'
+            Env.renderNodejs()
+            Toast.error(result.error || '下载失败')
+          }
+        })
+      })
       DOM.env.npmUpdate.addEventListener('click', function () { Env.updateNpm() })
       DOM.env.pnpmUpdate.addEventListener('click', function () { Env.updatePnpm() })
       DOM.env.dshUpdate.addEventListener('click', function () { Env.updateDsh() })

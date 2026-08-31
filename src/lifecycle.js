@@ -192,6 +192,26 @@ async function bootstrap() {
   registerIpcHandlers()
   bootMark('whenReady')
 
+  // Node.js 检测：若不存在全局 Node.js，打开设置页引导用户配置
+  try {
+    const { checkGlobalNode } = require('./nodejs-bootstrap')
+    const global = await checkGlobalNode()
+    if (global.available) {
+      bootMark('nodejs check done (global available)')
+    } else {
+      bootMark('nodejs check done (not found)')
+      // 延迟打开设置页引导用户
+      setTimeout(() => {
+        try { showSettingsOverlay() } catch (e) {
+          logEvent('bootstrap.nodejs-settings-overlay.fail', { err: e }, 'error')
+        }
+      }, 1000)
+    }
+  } catch (nodeErr) {
+    logEvent('bootstrap.nodejs-check.fail', { err: nodeErr.message }, 'error')
+    // 不阻断启动，后续 dsh 启动失败会走现有的 fallback 逻辑
+  }
+
   applyAutoStart(store.get('ui.autoStart', false))
   bootMark('applyAutoStart done')
 

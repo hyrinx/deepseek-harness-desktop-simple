@@ -55,6 +55,7 @@
         appDownload: qs('appDownloadBtn'), appInstall: qs('appInstallBtn'),
         appProgress: qs('appProgress'), appFill: qs('appFill'), appProgressText: qs('appProgressText'),
         nodeStatus: qs('nodeStatus'), nodeVersion: qs('nodeVersion'), nodeRefresh: qs('nodeRefreshBtn'),
+        nodejsPathRow: qs('nodejsPathRow'), nodejsPathStatus: qs('nodejsPathStatus'), nodejsPathValue: qs('nodejsPathValue'), nodejsPathSetBtn: qs('nodejsPathSetBtn'), nodejsDownloadBtn: qs('nodejsDownloadBtn'), nodejsProgress: qs('nodejsProgress'), nodejsFill: qs('nodejsFill'), nodejsProgressText: qs('nodejsProgressText'),
         npmStatus: qs('npmStatus'), npmVersion: qs('npmVersion'), npmUpdate: qs('npmUpdateBtn'),
         pnpmStatus: qs('pnpmStatus'), pnpmVersion: qs('pnpmVersion'), pnpmUpdate: qs('pnpmUpdateBtn'),
         dshStatus: qs('dshStatus'), dshVersion: qs('dshVersion'), dshUpdate: qs('dshUpdateBtn'),
@@ -71,6 +72,7 @@
       env: {
         app: { checking: false, status: 'idle', version: '', latestVersion: '', progress: 0 },
         node: { ok: false, version: '', checking: false },
+        nodejs: { globalAvailable: false, globalVersion: '', globalPath: '', localInstalled: false, localPath: '', pathConfigured: false, downloading: false, downloadProgress: 0, downloadMessage: '' },
         npm: { ok: false, version: '', latestVersion: '', checking: false },
         pnpm: { ok: false, version: '', latestVersion: '', checking: false },
         dsh: { ok: false, version: '', latestVersion: '', checking: false },
