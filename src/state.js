@@ -35,6 +35,7 @@ const state = {
   hostOrigin: null,
   hostStdoutTail: '',
   isQuitting: false,
+  isRestarting: false,
 }
 
 function clearRef(name) {

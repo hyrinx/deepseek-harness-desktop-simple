@@ -157,13 +157,14 @@ function waitForHostReady(child) {
     child.on('exit', (code, signal) => {
       const beforeReady = !settled
       const expected = state.isQuitting
+      const restarting = state.isRestarting
       logEvent(
-        expected ? 'host.exit.expected' : beforeReady ? 'host.exit.before-ready' : 'host.exit.unexpected',
-        { pid: child.pid, code, signal, beforeReady, expected, isQuitting: state.isQuitting },
-        expected ? 'info' : 'error',
+        expected ? 'host.exit.expected' : restarting ? 'host.exit.restarting' : beforeReady ? 'host.exit.before-ready' : 'host.exit.unexpected',
+        { pid: child.pid, code, signal, beforeReady, expected, restarting, isQuitting: state.isQuitting },
+        expected || restarting ? 'info' : 'error',
       )
       if (beforeReady) fail(`Host 在就绪前退出（code ${code}, signal ${signal}）`)
-      else if (!expected) {
+      else if (!expected && !restarting) {
         logEvent('host.exit.unexpected.console', { code, signal }, 'error')
         const { showSettingsOverlay } = require('./windows')
         showSettingsOverlay()
@@ -193,7 +194,9 @@ function shutdownHost() {
 
 async function restartHost() {
   logEvent('host.restart.start')
+  state.isRestarting = true
   await shutdownHost()
+  state.isRestarting = false
   state.host = spawnDshWeb()
   state.hostOrigin = await waitForHostReady(state.host)
   logEvent('host.restart.ok', { origin: state.hostOrigin })
