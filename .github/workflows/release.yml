@@ -49,7 +49,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/*
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest*.yml
 
   release:
     needs: build
@@ -72,6 +80,7 @@ jobs:
         run: ls -R dist/
 
       - name: 生成发布说明(更新内容)
+        id: notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -112,7 +121,7 @@ jobs:
             echo
             echo "$NOTES"
           } > NOTES.md
-          echo "RESULT_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: 发布到 GitHub Release (草稿)
         uses: softprops/action-gh-release@v2
@@ -129,15 +138,30 @@ jobs:
             dist/*/*.blockmap
             dist/*/latest*.yml
           body_path: NOTES.md
-          tag_name: ${{ env.RESULT_TAG }}
+          tag_name: ${{ steps.notes.outputs.tag }}
           draft: true
+
+      - name: 校验资产上传
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          TAG="${{ steps.notes.outputs.tag }}"
+          # 等待 GitHub API 索引完成,避免竞态
+          sleep 5
+          ASSET_COUNT=$(gh release view "$TAG" --json assets --jq '.assets | length')
+          echo "已上传资产数量: $ASSET_COUNT"
+          if [ "$ASSET_COUNT" -eq 0 ]; then
+            echo "::error::未上传任何资产,请检查 action-gh-release 的 files 通配符是否匹配到文件"
+            exit 1
+          fi
 
       - name: 生成安装包下载表(按真实资产)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
-          TAG="${{ env.RESULT_TAG }}"
+          TAG="${{ steps.notes.outputs.tag }}"
           # 读取 Release 实际托管的资产下载地址,保证下载链接与上传名完全一致
           # (不直接用本地文件名拼 URL,可规避 GitHub 将文件名空格转点号导致的 404)
           gh release view "$TAG" --json assets \
@@ -158,6 +182,13 @@ jobs:
                   *arm64*) fmt="macOS 苹果芯片 (.dmg)" ;;
                   *x64*)   fmt="macOS Intel (.dmg)" ;;
                   *)       fmt="macOS (.dmg)" ;;
+                esac
+                MAC+=("$fmt|$url") ;;
+              *.zip)
+                case "$lower" in
+                  *arm64*) fmt="macOS 苹果芯片 (.zip)" ;;
+                  *x64*)   fmt="macOS Intel (.zip)" ;;
+                  *)       fmt="macOS (.zip)" ;;
                 esac
                 MAC+=("$fmt|$url") ;;
               *.appimage) LIN+=("Linux AppImage|$url") ;;
@@ -186,4 +217,4 @@ jobs:
       - name: 更新发布正文
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ env.RESULT_TAG }}" --notes-file RELEASE_BODY.md
+        run: gh release edit "${{ steps.notes.outputs.tag }}" --notes-file RELEASE_BODY.md
