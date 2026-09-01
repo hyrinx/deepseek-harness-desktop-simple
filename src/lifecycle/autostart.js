@@ -10,9 +10,9 @@
 
 const { app } = require('electron')
 const { execSync } = require('node:child_process')
-const { logEvent } = require('./state')
-const { AUTOSTART_ARG, IS_WIN } = require('./constants')
-const { realExePath } = require('./env')
+const { logEvent } = require('../core/state')
+const { AUTOSTART_ARG, IS_WIN } = require('../core/constants')
+const { realExePath } = require('../core/runtime')
 
 // 仅 Windows：让 set/get 传入一致的值名 + path + args
 // name(值名)必须显式传：Electron 在 Windows 删除自启项时，只有显式传入 name

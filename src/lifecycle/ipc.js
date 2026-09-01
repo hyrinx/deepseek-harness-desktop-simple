@@ -4,12 +4,12 @@
 
 const { BrowserWindow, shell, app, ipcMain } = require('electron')
 const fs = require('node:fs')
-const { logEvent } = require('./state')
-const { store } = require('./store')
-const { logDirPath } = require('./constants')
+const { logEvent } = require('../core/state')
+const { store } = require('../core/store')
+const { logDirPath } = require('../core/constants')
 const { applyAutoStart, readAutoStart } = require('./autostart')
 const { registerEnvHandlers } = require('./env')
-const { registerNodeJsHandlers } = require('./nodejs-bootstrap')
+const { registerNodeJsHandlers } = require('../update/nodejs-bootstrap')
 const { SHORTCUT_KEYS, registerGlobalShortcut } = require('./shortcut')
 
 // ── IPC 处理器 ──
@@ -43,7 +43,7 @@ function registerIpcHandlers() {
   // 日志相关（单文件 host.log）
   ipcMain.handle('logs:get-info', () => {
     const dir = logDirPath()
-    const path = require('./constants').logFilePath()
+    const path = require('../core/constants').logFilePath()
     let info = { exists: false, size: 0, mtime: null, path, name: 'host.log' }
     try {
       const st = fs.statSync(path)
@@ -60,7 +60,7 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('logs:open-file', async () => {
-    const target = require('./constants').logFilePath()
+    const target = require('../core/constants').logFilePath()
     try {
       if (!fs.existsSync(target)) {
         fs.mkdirSync(logDirPath(), { recursive: true })
@@ -74,7 +74,7 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('logs:tail', async (_e, maxChars = 32_768) => {
-    const target = require('./constants').logFilePath()
+    const target = require('../core/constants').logFilePath()
     try {
       const st = fs.statSync(target)
       if (st.size <= maxChars) {
@@ -95,7 +95,7 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('logs:clear', async () => {
-    const target = require('./constants').logFilePath()
+    const target = require('../core/constants').logFilePath()
     try {
       fs.writeFileSync(target, '', 'utf-8')
       return { ok: true }
@@ -214,25 +214,25 @@ function registerIpcHandlers() {
 
   // 自动更新
   ipcMain.handle('update:check', async () => {
-    const { checkForUpdates, getUpdateState } = require('./updater')
+    const { checkForUpdates, getUpdateState } = require('../update/updater')
     await checkForUpdates()
     return getUpdateState()
   })
 
   ipcMain.handle('update:download', async () => {
-    const { downloadUpdate, getUpdateState } = require('./updater')
+    const { downloadUpdate, getUpdateState } = require('../update/updater')
     await downloadUpdate()
     return getUpdateState()
   })
 
   ipcMain.handle('update:install', async () => {
-    const { quitAndInstall } = require('./updater')
+    const { quitAndInstall } = require('../update/updater')
     quitAndInstall()
     return true
   })
 
   ipcMain.handle('update:get-state', () => {
-    const { getUpdateState } = require('./updater')
+    const { getUpdateState } = require('../update/updater')
     return getUpdateState()
   })
 
@@ -248,6 +248,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle('update:get-skipped-version', () => {
     return store.get('update.skippedVersion') || ''
+  })
+
+  ipcMain.handle('update:set-skipped-version', (_e, version) => {
+    store.set('update.skippedVersion', String(version || ''))
+    logEvent('updater.skip-version', { version: String(version || '') })
+    return true
   })
 
   // 重启 dsh web 子进程并重新导航

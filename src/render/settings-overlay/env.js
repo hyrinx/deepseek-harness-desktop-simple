@@ -14,6 +14,43 @@
           return
         }
         versionEl.classList.remove('loading')
+        // 工具（plugin/npm/pnpm/dsh）共用：已安装 → 检查更新/更新；未安装 → 安装
+      const ICON_UPDATE = '<svg class="btn-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>'
+      const ICON_DOWNLOAD = '<svg class="btn-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>'
+      const ICON_PLUS = '<svg class="btn-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>'
+      // 渲染一个"包工具"（plugin/npm/pnpm/dsh）：未安装 → 安装；有更新 → 更新；否则 → 检查更新
+      const renderTool = function (info, updateBtn) {
+        const uninstalled = info.installed === false || info.ok === false
+        if (uninstalled) {
+          versionEl.textContent = '未安装'
+          statusEl.innerHTML = '<span class="status-dot err"></span> 未检测到'
+          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = ICON_PLUS + '安装' }
+          return
+        }
+        const hasUpdate = Boolean(info.latestVersion && info.version && info.latestVersion !== info.version)
+        if (hasUpdate) {
+          versionEl.textContent = info.version + ' → ' + info.latestVersion
+          statusEl.innerHTML = '<span class="status-dot warn"></span> 有新版本可用'
+          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = ICON_UPDATE + '更新' }
+        } else {
+          versionEl.textContent = info.version
+          statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
+          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = ICON_DOWNLOAD + '检查更新' }
+        }
+      }
+      // 渲染"平台工具"（node 本地/全局）状态行
+      const renderPlatformTool = function (info) {
+        versionEl.textContent = info.version
+        const pathInfo = info.localPath || info.globalPath || ''
+        if (pathInfo) {
+          statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装 (' + pathInfo + ')'
+          statusEl.title = pathInfo
+        } else {
+          statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装（全局）'
+        }
+        if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = ICON_UPDATE + '检查更新' }
+        DOM.env.nodejsProgress.style.display = 'none'
+      }
         if (key === 'app') {
           DOM.env.appProgress.style.display = 'none'
           if (updateBtn) updateBtn.style.display = ''
@@ -54,56 +91,18 @@
           }
           return
         }
-        if (key === 'plugin') {
-          if (info.installed) {
-            const hasUpdate = info.latestVersion && info.version && info.latestVersion !== info.version
-            if (hasUpdate) {
-              versionEl.textContent = info.version + ' → ' + info.latestVersion
-              statusEl.innerHTML = '<span class="status-dot warn"></span> 有新版本可用'
-              if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>更新' }
-            } else {
-              versionEl.textContent = info.version
-              statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
-              if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>检查更新' }
-            }
-          } else {
-            versionEl.textContent = '未安装'
-            statusEl.innerHTML = '<span class="status-dot err"></span> 未检测到'
-            if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>安装' }
-          }
-        } else if (key === 'npm' || key === 'pnpm' || key === 'dsh') {
-          if (info.ok) {
-            const hasUpdate = info.latestVersion && info.version && info.latestVersion !== info.version
-            if (hasUpdate) {
-              versionEl.textContent = info.version + ' → ' + info.latestVersion
-              statusEl.innerHTML = '<span class="status-dot warn"></span> 有新版本可用'
-              if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>更新' }
-            } else {
-              versionEl.textContent = info.version
-              statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
-              if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>检查更新' }
-            }
-          } else {
-            versionEl.textContent = '未安装'
-            statusEl.innerHTML = '<span class="status-dot err"></span> 未检测到'
-            if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>安装' }
-          }
-        } else if (info.ok) {
-          versionEl.textContent = info.version
-          var pathInfo = info.localPath || info.globalPath || ''
-          if (pathInfo) {
-            statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装 (' + pathInfo + ')'
-            statusEl.title = pathInfo
-          } else {
-            statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装（全局）'
-          }
-          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>检查更新' }
-          DOM.env.nodejsProgress.style.display = 'none'
+        if (key === 'plugin' || key === 'npm' || key === 'pnpm' || key === 'dsh') {
+          renderTool(info, updateBtn)
         } else {
-          versionEl.textContent = '未安装'
-          statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.version || '未检测到')
-          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>安装' }
-          DOM.env.nodejsProgress.style.display = 'none'
+          // node：本地已装则走平台工具；全局可用则 ok；否则未安装
+          if (info.localInstalled === true || info.ok === true) {
+            renderPlatformTool(info)
+          } else {
+            versionEl.textContent = '未安装'
+            statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.version || '未检测到')
+            if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = ICON_DOWNLOAD + '安装' }
+            DOM.env.nodejsProgress.style.display = 'none'
+          }
         }
         if (refreshBtn) refreshBtn.disabled = false
       },

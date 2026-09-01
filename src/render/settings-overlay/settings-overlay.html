@@ -232,4 +232,22 @@
     </div>
   </div>
 </div>
-<div class="toast" id="dsh-so-toast"></div>
+<!-- ▌ 更新提示弹窗（antd Modal 风格，默认隐藏） -->
+  <div class="so-modal-mask" id="dsh-so-updateMask"></div>
+  <div class="so-modal" id="dsh-so-updateModal" role="dialog" aria-modal="true" aria-labelledby="dsh-so-updateTitle" style="display:none;">
+    <div class="so-modal-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+    </div>
+    <div class="so-modal-title">发现新版本</div>
+    <div class="so-modal-text">发现新版本 <strong id="dsh-so-updateNewVersion">v0.0.0</strong></div>
+    <div class="so-modal-desc">下载完成后可在设置页「关于」标签中安装。</div>
+    <div class="so-modal-footer">
+      <button class="btn" id="dsh-so-updateSkipBtn">跳过此版本</button>
+      <button class="btn" id="dsh-so-updateNoRemindBtn">不再提醒</button>
+      <button class="btn btn-primary" id="dsh-so-updateDownloadBtn">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        立即下载
+      </button>
+    </div>
+  </div>
+  <div class="toast" id="dsh-so-toast"></div>

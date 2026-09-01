@@ -2,7 +2,7 @@
 // 全局快捷键管理（主进程）
 // ═══════════════════════════════════════════════════════════════
 
-const { logEvent } = require('./state')
+const { logEvent } = require('../core/state')
 
 // 渲染进程可写入的快捷键键名白名单（防原型污染 / 越权写入 store 任意路径）
 const SHORTCUT_KEYS = new Set(['toggleWindow'])

@@ -4,8 +4,8 @@
 
 const { spawn } = require('node:child_process')
 const { app } = require('electron')
-const { state, logEvent, logWriter, bootMark } = require('./state')
-const { IS_WIN, IS_LINUX, IS_MAC, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT } = require('./constants')
+const { state, logEvent, logWriter, bootMark } = require('../core/state')
+const { IS_WIN, IS_LINUX, IS_MAC, READINESS_PREFIX, READINESS_TIMEOUT_MS, HOST_STDOUT_TAIL_LIMIT } = require('../core/constants')
 
 function spawnDshWeb() {
   bootMark('spawn dsh web')

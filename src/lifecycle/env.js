@@ -1,52 +1,22 @@
 // ═══════════════════════════════════════════════════════════════
-// 运行时模式检测 + Node.js / npm / dsh 环境检测与更新
+// 环境检测与更新（Node.js / npm / pnpm / dsh / dshmarket 插件）
 //
-// 三种运行模式：
-//   dev       — 开发模式（electron .），app.isPackaged === false
-//   installer — NSIS 安装包，exe 在 Program Files（稳定）
-//   portable  — electron-builder portable，exe 解压到 %TEMP% 运行
-//                PORTABLE_EXECUTABLE_FILE 指向用户双击的真实 exe（含版本号）
+// 本模块运行在主进程业务域（lifecycle），负责：
+//   - 检测本机各运行时是否安装、当前版本
+//   - 查询同名 npm 包在镜像 registry 上的最新版本（多 registry 自动降级）
+//   - 执行 npm install -g 进行升级，实时推送进度到渲染进程
+//   - 统一注册环境相关 IPC 处理器
+//
+// 纯运行时检测（dev/portable/installer、真实 exe 路径）见 core/runtime.js。
 // ═══════════════════════════════════════════════════════════════
 
 const { execFile, spawn } = require('node:child_process')
-const { IS_WIN } = require('./constants')
+const { IS_WIN } = require('../core/constants')
+const { getJson } = require('../core/net')
 
-// ═══════════════════════════════════════════════════════════════
-// 运行时模式
-// ═══════════════════════════════════════════════════════════════
-
-function mode() {
-  const { app } = require('electron')
-  if (!app.isPackaged) return 'dev'
-  if (process.env.PORTABLE_EXECUTABLE_DIR) return 'portable'
-  return 'installer'
-}
-
-// 真实 exe 路径（稳定，重启后仍有效）
-// dev 模式返回 null（调用方用 app.relaunch 默认 execPath）
-// 便携版用 PORTABLE_EXECUTABLE_FILE（含版本号文件名，如 "App 1.0.0.exe"），
-// 不能用 basename(app.getPath('exe'))，因为内层 exe 名不含版本号
-function realExePath() {
-  const { app } = require('electron')
-  if (!app.isPackaged) return null
-  if (process.env.PORTABLE_EXECUTABLE_FILE) return process.env.PORTABLE_EXECUTABLE_FILE
-  return app.getPath('exe')
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 环境检测
-// ═══════════════════════════════════════════════════════════════
-
-function runCmd(cmd, args, timeoutMs = 15_000) {
-  return new Promise((resolve) => {
-    // Windows 上 npm/dsh 是 .cmd 批处理文件，必须 shell:true 才能解析
-    execFile(cmd, args, { timeout: timeoutMs, windowsHide: true, shell: IS_WIN, maxBuffer: 8 * 1024 * 1024 },
-      (err, stdout) => {
-        if (err) return resolve({ ok: false, error: err.message, version: '' })
-        resolve({ ok: true, error: '', version: String(stdout).trim() })
-      })
-  })
-}
+// npm 包 registry 镜像（国内优先，官方兜底）
+// 走 JSON API 而非本地 `npm view`，不依赖用户本地的 npm 配置与可达性。
+const NPM_REGISTRIES = ['https://registry.npmmirror.com', 'https://registry.npmjs.org']
 
 // 使用 spawn 执行命令，实时推送输出到渲染进程，避免 execFile 缓冲导致的"卡住"体验
 function runWithProgress(event, cmd, args, timeoutMs) {
@@ -71,16 +41,28 @@ function runWithProgress(event, cmd, args, timeoutMs) {
   })
 }
 
-// 查询 npm 包的最新版本号
-function checkLatestNpmPkg(pkgName) {
+// Windows 上 npm/dsh 是 .cmd 批处理文件，必须 shell:true 才能解析
+function runCmd(cmd, args, timeoutMs = 15_000) {
   return new Promise((resolve) => {
-    execFile('npm', ['view', pkgName, 'version'],
-      { timeout: 10_000, windowsHide: true, shell: IS_WIN, maxBuffer: 1024 * 1024 },
+    execFile(cmd, args, { timeout: timeoutMs, windowsHide: true, shell: IS_WIN, maxBuffer: 8 * 1024 * 1024 },
       (err, stdout) => {
-        if (err) return resolve('')
-        resolve(String(stdout).trim())
+        if (err) return resolve({ ok: false, error: err.message, version: '' })
+        resolve({ ok: true, error: '', version: String(stdout).trim() })
       })
   })
+}
+
+// 查询 npm 包的最新版本号（多 registry 自动降级，返回 '' 表示查询失败）
+async function checkLatestNpmPkg(pkgName) {
+  for (const registry of NPM_REGISTRIES) {
+    try {
+      // 形如 https://registry.npmmirror.com/npm/latest → 最新版元数据
+      const meta = await getJson(`${registry}/${encodeURIComponent(pkgName)}/latest`, { timeout: 15_000 })
+      const version = String((meta && (meta.version || (meta['dist-tags'] && meta['dist-tags'].latest))) || '').trim()
+      if (version) return version
+    } catch { /* 该镜像不可达 → 尝试下一个 */ }
+  }
+  return ''
 }
 
 async function checkNode() {
@@ -120,6 +102,7 @@ async function checkDsh() {
   ])
   return { ...installed, latestVersion }
 }
+
 // 检测 dshmarket 插件是否已安装及版本
 // 通过 dsh plugin --profile web list 获取已安装插件列表，解析 dshmarket 的版本
 // 同时通过 npm view 获取最新版本，用于判断是否需要更新
@@ -141,18 +124,13 @@ async function checkPlugin() {
       })
   })
 
-  const checkLatest = new Promise((resolve) => {
-    execFile('npm', ['view', 'dshmarket', 'version'],
-      { timeout: 10_000, windowsHide: true, shell: IS_WIN, maxBuffer: 1024 * 1024 },
-      (err, stdout) => {
-        if (err) return resolve('')
-        resolve(String(stdout).trim())
-      })
-  })
-
-  const [installed, latestVersion] = await Promise.all([checkInstalled, checkLatest])
+  const [installed, latestVersion] = await Promise.all([
+    checkInstalled,
+    checkLatestNpmPkg('dshmarket'),
+  ])
   return { ...installed, latestVersion }
 }
+
 async function updateNpm(event) {
   return runWithProgress(event, 'npm', ['install', '-g', 'npm@latest'], 60_000)
 }
@@ -164,6 +142,7 @@ async function updatePnpm(event) {
 async function updateDsh(event) {
   return runWithProgress(event, 'npm', ['install', '-g', '@deepseek-ai/dsh@latest'], 120_000)
 }
+
 async function updatePlugin(event) {
   const before = await checkPlugin()
   const beforeVer = before.installed ? before.version : '(未安装)'
@@ -188,7 +167,6 @@ function registerEnvHandlers(ipcMain) {
 }
 
 module.exports = {
-  mode, realExePath,
   checkNode, checkNpm, checkPnpm, checkDsh, checkPlugin,
   updateNpm, updatePnpm, updateDsh, updatePlugin,
   registerEnvHandlers,

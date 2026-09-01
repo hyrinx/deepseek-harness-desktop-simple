@@ -41,7 +41,7 @@ const { dshHomePath } = require('./dsh-home')
 //   - 开发模式：项目根目录
 //   - 安装模式：$DSH_HOME/logs/deepseek-harness-desktop/
 function logDirPath() {
-  if (require('./env').mode() === 'dev') return appRootDir()
+  if (require('./runtime').mode() === 'dev') return appRootDir()
   return dshHomePath('logs', 'deepseek-harness-desktop')
 }
 function logFilePath() { return join(logDirPath(), 'host.log') }
@@ -50,7 +50,7 @@ function logFilePath() { return join(logDirPath(), 'host.log') }
 //   - 开发模式：项目根目录
 //   - 安装模式：$DSH_HOME/storages/deepseek-harness-desktop/
 function configDirPath() {
-  if (require('./env').mode() === 'dev') return appRootDir()
+  if (require('./runtime').mode() === 'dev') return appRootDir()
   return dshHomePath('storages', 'deepseek-harness-desktop')
 }
 function configFilePath() { return join(configDirPath(), 'config.json') }

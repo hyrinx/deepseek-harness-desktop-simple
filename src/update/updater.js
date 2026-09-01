@@ -2,43 +2,31 @@
 // 自动更新（安装版 electron-updater + 便携版手动下载）
 //
 // 安装版（NSIS）：electron-updater 自动处理，下载安装包 → 静默安装
-// 便携版 / 开发模式：手动检查 GitHub API → 下载新 .exe → 替换脚本 → 退出
+// 便携版 / 开发模式：手动检查更新接口 → 下载新 .exe → 替换脚本 → 退出
 //
-// 多源检测：内置多个 GitHub 加速镜像，自动依次尝试，无需用户配置
+// 版本探测与多源降级收敛到 update-sources.js；
+// 所有 HTTP(S) 请求收敛到 net.js（统一超时 / 重定向 / 证书可读报错）。
+// 更新源：Gitee 优先，GitHub 兜底，不再依赖任何第三方镜像。
 // ═══════════════════════════════════════════════════════════════
 
-const { app, dialog } = require('electron')
-const { logEvent } = require('./state')
-const { mode } = require('./env')
-const { store } = require('./store')
-
-const UPDATE_REPO = 'hyrinx/deepseek-harness-desktop-simple'
-const UPDATE_FEED_URL = `https://github.com/${UPDATE_REPO}`
-const UPDATE_API_URL = `https://api.github.com/repos/${UPDATE_REPO}/releases/latest`
-
-// 内置镜像源，自动依次尝试
-const MIRRORS = [
-  'https://ghproxy.com/',
-  'https://gh.api.99988866.xyz/',
-]
-
-// 简单语义版本比较：a > b 返回 true
-function isVersionNewer(a, b) {
-  if (!a || !b) return false
-  const av = a.split('.').map(Number)
-  const bv = b.split('.').map(Number)
-  for (let i = 0; i < Math.max(av.length, bv.length); i++) {
-    if ((av[i] || 0) > (bv[i] || 0)) return true
-    if ((av[i] || 0) < (bv[i] || 0)) return false
-  }
-  return false
-}
+const { app } = require('electron')
+const fs = require('node:fs')
+const path = require('node:path')
+const { spawn } = require('node:child_process')
+const { logEvent } = require('../core/state')
+const { mode } = require('../core/runtime')
+const { store } = require('../core/store')
+const { IS_WIN } = require('../core/constants')
+const { fetchBuffer } = require('../core/net')
+const {
+  SOURCES, isVersionNewer, downloadUrlFor, probeLatestRelease,
+} = require('./update-sources')
 
 // ── 更新状态（供 UI 读取） ──
 const updateState = {
   status: 'idle',           // idle | checking | available | downloading | downloaded | error | no-update
   version: null,            // 新版本号
-  downloadedFile: null,     // 下载的文件路径（便携版）
+  downloadedFile: null,     // 下载的文件路径
   error: null,              // 错误信息
   progress: 0,              // 下载进度 0-100
   checkTime: null,          // 上次检查时间
@@ -107,6 +95,22 @@ async function checkForUpdatesInstaller() {
   const au = getAutoUpdater()
   try {
     setUpdateState({ status: 'checking', error: null, checkTime: new Date().toISOString() })
+
+    // 优先探测源（Gitee → GitHub），并把 electron-updater 指向命中源
+    const { source, tag } = await probeLatestRelease()
+
+    if (source === 'gitee') {
+      // Gitee 用 generic provider：指向该版本 release 资产目录（含 latest.yml）
+      const feed = SOURCES.find((s) => s.name === 'gitee').feed
+      const url = `${feed}/releases/download/${tag}`
+      au.setFeedURL({ provider: 'generic', url })
+      logEvent('updater.installer.feed', { source, url })
+    } else {
+      // GitHub 走原生 provider（由 package.json publish 提供 owner/repo）
+      au.setFeedURL({ provider: 'github', owner: 'hyrinx', repo: 'deepseek-harness-desktop-simple' })
+      logEvent('updater.installer.feed', { source })
+    }
+
     await au.checkForUpdates()
   } catch (err) {
     logEvent('updater.installer.check-fail', { err: err.message }, 'error')
@@ -133,86 +137,55 @@ function quitAndInstallInstaller() {
 
 // ── 便携版：手动下载 ──
 
-const https = require('node:https')
-const http = require('node:http')
-const fs = require('node:fs')
-const path = require('node:path')
-const { spawn } = require('node:child_process')
-const { IS_WIN } = require('./constants')
-
-function fetchUrl(url) {
-  return new Promise((resolve, reject) => {
-    const mod = url.startsWith('https') ? https : http
-    const headers = {}
-    if (url.includes('api.github.com') || url.includes('github.com')) {
-      headers['User-Agent'] = 'DeepSeekHarnessDesktop/' + (app.getVersion ? app.getVersion() : '0.0.0')
-    }
-    const req = mod.get(url, { timeout: 30_000, headers }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchUrl(res.headers.location).then(resolve).catch(reject)
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode}`))
-      }
-      const chunks = []
-      res.on('data', (c) => chunks.push(c))
-      res.on('end', () => resolve(Buffer.concat(chunks)))
-      res.on('error', reject)
-    })
-    req.on('error', reject)
-    req.on('timeout', () => { req.destroy(); reject(new Error('请求超时')) })
+/**
+ * 下载指定 tag 下的资产文件（跨源降级）。
+ * 优先尝试 preferredSource，失败则依次尝试其余源。
+ * @returns {Promise<{source, buffer, url}>}
+ */
+async function downloadReleaseAsset(preferredSource, tag, fileName, onProgress) {
+  const ordered = [...SOURCES].sort((a, b) => {
+    if (a.name === preferredSource) return -1
+    if (b.name === preferredSource) return 1
+    return 0
   })
-}
-
-// 多源同时检测：所有源并发请求，取最快响应的结果
-async function fetchWithFallback(url) {
-  const urls = [url, ...MIRRORS.map(function (m) { return m.replace(/\/+$/, '') + '/' + url })]
-
-  try {
-    return await Promise.any(urls.map(function (u) { return fetchUrl(u) }))
-  } catch (err) {
-    logEvent('updater.fetch.all-fail', { url, errs: err.errors && err.errors.map(function (e) { return e.message }) }, 'error')
-    throw new Error('所有更新源均不可用，请检查网络连接')
+  let lastErr
+  for (const src of ordered) {
+    const url = downloadUrlFor(src.name, tag, fileName)
+    try {
+      const { buffer } = await fetchBuffer(url, { timeout: 5 * 60_000, onProgress })
+      logEvent('updater.portable.download-ok', { source: src.name, url, size: buffer.length })
+      return { source: src.name, buffer, url }
+    } catch (e) {
+      logEvent('updater.portable.download-source-fail', { source: src.name, err: e.message }, 'warn')
+      lastErr = e
+    }
   }
+  throw lastErr || new Error('所有更新源下载均失败')
 }
 
 async function checkForUpdatesPortable() {
   try {
     setUpdateState({ status: 'checking', error: null, checkTime: new Date().toISOString() })
 
-    // 多源自动检测最新版本
-    const apiBuf = await fetchWithFallback(UPDATE_API_URL)
-    let releaseData
-    try {
-      releaseData = JSON.parse(apiBuf.toString('utf-8'))
-    } catch {
-      setUpdateState({ status: 'error', error: '无法解析 GitHub API 响应' })
-      return
-    }
-
-    const remoteVersion = (releaseData.tag_name || '').replace(/^v/, '')
+    // 按优先级（Gitee → GitHub）自动检测最新版本
+    const probe = await probeLatestRelease()
+    const remoteVersion = probe.version
     const currentVersion = app.getVersion()
 
-    logEvent('updater.portable.check', { current: currentVersion, remote: remoteVersion })
+    logEvent('updater.portable.check', { source: probe.source, current: currentVersion, remote: remoteVersion })
 
     if (!remoteVersion) {
       setUpdateState({ status: 'error', error: '无法解析远程版本信息' })
       return
     }
 
-    if (remoteVersion === currentVersion) {
+    if (remoteVersion === currentVersion || !isVersionNewer(remoteVersion, currentVersion)) {
       setUpdateState({ status: 'no-update', version: currentVersion })
       return
     }
 
-    // 语义版本比较
-    if (!isVersionNewer(remoteVersion, currentVersion)) {
-      setUpdateState({ status: 'no-update', version: currentVersion })
-      return
-    }
-
-    // 保存 release 数据供下载使用
-    updateState._releaseData = releaseData
+    // 保存探测结果供下载使用
+    updateState._probe = probe
 
     setUpdateState({ status: 'available', version: remoteVersion, error: null })
   } catch (err) {
@@ -224,45 +197,42 @@ async function checkForUpdatesPortable() {
 async function downloadUpdatePortable() {
   try {
     const version = updateState.version
-    const releaseData = updateState._releaseData
+    const probe = updateState._probe
     if (!version) {
       setUpdateState({ status: 'error', error: '没有可用的更新版本' })
       return
     }
+    const releaseTag = probe ? probe.tag : `v${version}`
+    const release = probe ? probe.release : null
+    const source = probe ? probe.source : null
 
     setUpdateState({ status: 'downloading', progress: 0 })
 
     // 从 release assets 中找到便携版 .exe（不含 "Setup" 的 .exe）
-    const assets = releaseData && releaseData.assets ? releaseData.assets : []
-    let downloadUrl = null
+    const assets = release && Array.isArray(release.assets) ? release.assets : []
     let fileName = null
-
     for (const asset of assets) {
       const name = asset.browser_download_url || ''
       if (name.endsWith('.exe') && !name.includes('Setup')) {
-        downloadUrl = asset.browser_download_url
         fileName = asset.name
         break
       }
     }
-
-    if (!downloadUrl) {
-      // 回退：使用标准命名格式
+    if (!fileName) {
       fileName = `DeepSeek Harness Desktop Simple ${version}.exe`
-      downloadUrl = `${UPDATE_FEED_URL}/releases/download/v${version}/${encodeURI(fileName)}`
     }
 
-    // 多源自动检测下载
-    logEvent('updater.portable.download-start', { url: downloadUrl, fileName })
-
-    // 下载到临时目录
     const tmpDir = require('node:os').tmpdir()
     const destPath = path.join(tmpDir, fileName)
 
-    const buf = await fetchWithFallback(downloadUrl)
-    fs.writeFileSync(destPath, buf)
+    const { buffer } = await downloadReleaseAsset(source, releaseTag, fileName, (p) => {
+      const pct = p.total ? Math.round((p.received / p.total) * 100) : 0
+      setUpdateState({ progress: pct })
+    })
 
-    logEvent('updater.portable.downloaded', { path: destPath, size: buf.length })
+    fs.writeFileSync(destPath, buffer)
+
+    logEvent('updater.portable.downloaded', { path: destPath, size: buffer.length })
     setUpdateState({ status: 'downloaded', downloadedFile: destPath, progress: 100 })
   } catch (err) {
     logEvent('updater.portable.download-fail', { err: err.message }, 'error')
@@ -326,7 +296,7 @@ function quitAndInstallPortable() {
   }
 
   // 退出当前进程（使用延迟 require 避免循环依赖）
-  const { requestQuit } = require('./lifecycle')
+  const { requestQuit } = require('../lifecycle/lifecycle')
   requestQuit()
 }
 

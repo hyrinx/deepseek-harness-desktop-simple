@@ -29,6 +29,12 @@
   // ════════════════════════════════════════════════
   window.__dshShowSettingsOverlay = function () {
     overlay.style.display = 'flex'
+    const panel = overlay.querySelector('#dsh-so-panel')
+    const mask = overlay.querySelector('#dsh-so-updateMask')
+    const modal = overlay.querySelector('#dsh-so-updateModal')
+    if (panel) panel.style.display = ''
+    if (mask) mask.style.display = 'none'
+    if (modal) { modal.style.display = 'none'; modal.classList.remove('show') }
     if (!overlay.__dshInited) {
       overlay.__dshInited = true
       initSettingsOverlay()
@@ -36,6 +42,18 @@
   }
   window.__dshHideSettingsOverlay = function () {
     overlay.style.display = 'none'
+  }
+
+  // 启动时发现新版本 → 显示 antd 风格更新弹窗（由主进程调用）
+  window.__dshShowUpdateDialog = function (version) {
+    overlay.style.display = 'flex'
+    if (!overlay.__dshInited) {
+      overlay.__dshInited = true
+      initSettingsOverlay()
+    }
+    const panel = overlay.querySelector('#dsh-so-panel')
+    if (panel) panel.style.display = 'none'
+    if (window.__dshUpdateDialog) window.__dshUpdateDialog.open(String(version))
   }
 
   // ════════════════════════════════════════════════

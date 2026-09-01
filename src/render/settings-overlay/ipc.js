@@ -37,5 +37,6 @@
       updateGetAutoCheck: function () { try { return window.updateAPI.getAutoCheck() } catch (e) { return true } },
       updateSetAutoCheck: function (enabled) { try { return window.updateAPI.setAutoCheck(enabled) } catch (e) { return false } },
       updateGetSkippedVersion: function () { try { return window.updateAPI.getSkippedVersion() } catch (e) { return '' } },
+      updateSetSkippedVersion: function (version) { try { return window.updateAPI.setSkippedVersion(version) } catch (e) { return false } },
       restartHost: function () { try { return window.appAPI.restartHost() } catch (e) { Toast.error('重启失败'); return false } },
     }

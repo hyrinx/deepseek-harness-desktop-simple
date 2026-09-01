@@ -13,17 +13,20 @@ const { dialog } = require('electron')
 const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
-const https = require('node:https')
-const http = require('node:http')
-const { IS_WIN, IS_MAC, IS_LINUX } = require('./constants')
-const { logEvent } = require('./state')
+const { IS_WIN, IS_MAC, IS_LINUX } = require('../core/constants')
+const { logEvent } = require('../core/state')
+const { fetchBuffer, headAvailable } = require('../core/net')
 
+const { checkNode } = require('../lifecycle/env')
+
+// Node.js 主版本：安装时自动解析该大版本下的最新 patch
 const NODE_VERSION = '22'
+// 默认 npm registry（国内），配合 node_global 全局装包
 const NPM_REGISTRY = 'https://registry.npmmirror.com'
-const DOWNLOAD_TIMEOUT = 300_000
-const MIRROR_BASES = ['https://nodejs.org', 'https://npmmirror.com/mirrors/node']
-
-const { checkNode } = require('./env')
+// 单次下载超时（Node 解压包较大，放宽到 10 分钟）
+const DOWNLOAD_TIMEOUT = 10 * 60_000
+// Node.js 下载镜像（国内优先，官方兜底）；逐个尝试，自动降级
+const MIRROR_BASES = ['https://npmmirror.com/mirrors/node', 'https://nodejs.org']
 
 // ── 平台后缀 ──
 function platformSuffix() {
@@ -95,61 +98,41 @@ function reportProgress(stage, detail) {
   }
 }
 
-// ── HTTP 请求（HEAD 探测） ──
-function headRequest(url, timeoutMs = 10000) {
-  return new Promise((resolve) => {
-    const protocol = url.startsWith('https') ? https : http
-    const req = protocol.request(url, { method: 'HEAD', timeout: timeoutMs }, (res) => {
-      res.resume()
-      resolve(res.statusCode === 200)
-    })
-    req.on('error', () => resolve(false))
-    req.on('timeout', () => { req.destroy(); resolve(false) })
-    req.end()
-  })
+// ── GET 文本（拉取 SHASUMS256.txt / 版本目录清单） ──
+async function getText(url, timeout = 20_000) {
+  const { buffer } = await fetchBuffer(url, { timeout })
+  return buffer.toString('utf-8')
 }
 
-// ── HTTP 请求（GET 文本） ──
-function getText(url, timeoutMs = 15000) {
-  return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http
-    const req = protocol.get(url, { timeout: timeoutMs }, (res) => {
-      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`))
-      let data = ''
-      res.on('data', (chunk) => data += chunk)
-      res.on('end', () => resolve(data))
-    })
-    req.on('error', reject)
-    req.on('timeout', () => { req.destroy(); reject(new Error('请求超时')) })
-  })
-}
-
-// ── 解析下载地址（优先从 SHASUMS256.txt 获取最新版本，失败则回退探测） ──
+// ── 解析下载地址 ──
+// 优先从各镜像的 SHASUMS256.txt 解析大版本下的最新 patch；
+// 全失败则回退：用候选版本 + HEAD 探测镜像上是否存在对应 zip。
+// 两层都依赖镜像数组 MIRROR_BASES 自动降级。
 async function resolveDownloadUrl(major, suffix) {
   logEvent('nodejs-bootstrap.resolve-download-url.start', { major })
   const re = new RegExp(`node-v(\\d+\\.\\d+\\.\\d+)-${suffix}\\.zip`)
 
+  // 第一层：SHASUMS256.txt 精确拿最新版本
   for (const base of MIRROR_BASES) {
     try {
       const text = await getText(`${base}/dist/latest-v${major}.x/SHASUMS256.txt`)
-      const firstLine = text.split('\n')[0]
-      const m = firstLine.match(re)
+      const m = text.split('\n')[0].match(re)
       if (m) {
         const version = `v${m[1]}`
         const url = `${base}/dist/${version}/node-${version}-${suffix}.zip`
         logEvent('nodejs-bootstrap.resolve-download-url.ok', { version, base })
         return { version, url }
       }
-    } catch { /* 继续尝试下一个镜像 */ }
+    } catch { /* 该镜像不可达或响应异常 → 尝试下一个 */ }
   }
 
-  // 回退：探测硬编码的候选版本
+  // 第二层：候选版本 + HEAD 探测兜底
   logEvent('nodejs-bootstrap.resolve-download-url.fallback', { major })
   for (const dv of [`v${major}.11.0`, `v${major}.0.0`]) {
     const fn = `node-${dv}-${suffix}.zip`
     for (const base of MIRROR_BASES) {
       const url = `${base}/dist/${dv}/${fn}`
-      if (await headRequest(url)) {
+      if (await headAvailable(url)) {
         logEvent('nodejs-bootstrap.resolve-download-url.fallback-ok', { version: dv, base })
         return { version: dv, url }
       }
@@ -160,33 +143,10 @@ async function resolveDownloadUrl(major, suffix) {
   return null
 }
 
-// ── 下载文件（带进度） ──
-function downloadFile(url, destPath, onProgress) {
-  return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http
-    const req = protocol.get(url, { timeout: DOWNLOAD_TIMEOUT }, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        return downloadFile(res.headers.location, destPath, onProgress).then(resolve).catch(reject)
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode}`))
-      }
-      const total = parseInt(res.headers['content-length'], 10) || 0
-      let downloaded = 0
-      const file = fs.createWriteStream(destPath)
-      res.on('data', (chunk) => {
-        downloaded += chunk.length
-        const ok = file.write(chunk)
-        if (!ok) res.pause()
-        if (onProgress) onProgress({ downloaded, total })
-      })
-      file.on('drain', () => { res.resume() })
-      res.on('end', () => { file.end(); resolve() })
-      res.on('error', (err) => { file.close(); reject(err) })
-    })
-    req.on('error', reject)
-    req.on('timeout', () => { req.destroy(); reject(new Error('下载超时')) })
-  })
+// ── 下载（复用统一网络层 fetchBuffer，自动跟随重定向/统一超时/可读证书报错） ──
+async function downloadNodeZip(url, onProgress) {
+  const { buffer } = await fetchBuffer(url, { timeout: DOWNLOAD_TIMEOUT, onProgress })
+  return buffer
 }
 
 // ── 解压 zip（adm-zip，零依赖纯 JS） ──
@@ -262,15 +222,16 @@ async function ensureNodeJs() {
   const zipPath = path.join(tmpDir, fn)
 
   try {
-    await downloadFile(downloadUrl, zipPath, (progress) => {
-      const pct = progress.total ? Math.round(progress.downloaded / progress.total * 100) : 0
+    const zipBuffer = await downloadNodeZip(downloadUrl, (progress) => {
+      const pct = progress.total ? Math.round(progress.received / progress.total * 100) : 0
       reportProgress('downloading', {
         message: `正在下载 Node.js ${downloadVersion}...`,
         percent: pct,
-        downloaded: progress.downloaded,
+        downloaded: progress.received,
         total: progress.total,
       })
     })
+    fs.writeFileSync(zipPath, zipBuffer)
 
     // 解压
     reportProgress('extracting', { message: '正在解压...' })

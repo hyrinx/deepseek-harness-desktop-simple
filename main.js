@@ -23,9 +23,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { app, globalShortcut } = require('electron')
-const { logEvent, bootElapsed, installProcessGuards } = require('./src/state')
-const { showWindow } = require('./src/windows')
-const { bootstrap, showFatalAndQuit } = require('./src/lifecycle')
+const { logEvent, bootElapsed, installProcessGuards } = require('./src/core/state')
+const { showWindow } = require('./src/lifecycle/windows')
+const { bootstrap, showFatalAndQuit } = require('./src/lifecycle/lifecycle')
 
 // ── 进程级守卫（放最前面，兜住所有未捕获异常） ──
 installProcessGuards()
@@ -57,10 +57,10 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.unregisterAll()
   })
   app.on('window-all-closed', () => {
-    logEvent('app.window-all-closed', { isQuitting: require('./src/state').state.isQuitting })
+    logEvent('app.window-all-closed', { isQuitting: require('./src/core/state').state.isQuitting })
   })
   app.on('before-quit', (event) => {
-    logEvent('app.before-quit', { isQuitting: require('./src/state').state.isQuitting, defaultPrevented: event.defaultPrevented })
+    logEvent('app.before-quit', { isQuitting: require('./src/core/state').state.isQuitting, defaultPrevented: event.defaultPrevented })
   })
 
   app.whenReady()

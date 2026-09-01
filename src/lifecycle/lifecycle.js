@@ -3,13 +3,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { app, globalShortcut, dialog, session } = require('electron')
-const { state, clearRef, logEvent, logWriter, bootMark } = require('./state')
-const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, appRootDir } = require('./constants')
-const { store } = require('./store')
+const { state, clearRef, logEvent, logWriter, bootMark } = require('../core/state')
+const { APP_NAME, APP_USER_MODEL_ID, DEFAULT_SHORTCUT, AUTOSTART_ARG, logDirPath, appRootDir } = require('../core/constants')
+const { store } = require('../core/store')
 const { applyAutoStart, isLaunchedByAutostart } = require('./autostart')
 const { registerIpcHandlers } = require('./ipc')
 const { registerGlobalShortcut } = require('./shortcut')
-const { openLogFile, openTerminal } = require('./utils')
+const { openLogFile, openTerminal } = require('../core/utils')
 
 function destroyUI() {
   clearRef('trayMenu')
@@ -35,7 +35,7 @@ async function requestQuit() {
 async function requestRestart() {
   if (state.isQuitting) { return }
   state.isQuitting = true
-  const { realExePath, mode } = require('./env')
+  const { realExePath, mode } = require('../core/runtime')
   try { destroyUI() } catch (err) { logEvent('restart.destroyUI.fail', { err }, 'warn') }
   try {
     const { shutdownHost } = require('./host')
@@ -184,35 +184,17 @@ async function bootstrap() {
  */
 function setupAutoUpdate() {
   try {
-    const { setupUpdater, checkForUpdates, downloadUpdate, onStartupUpdateAvailable } = require('./updater')
+    const { setupUpdater, checkForUpdates, onStartupUpdateAvailable } = require('../update/updater')
     setupUpdater()
 
-    // 启动时发现新版本 → 弹窗询问用户
+    // 启动时发现新版本 → 显示 antd 风格自定义弹窗（不再使用系统原生弹窗）
     onStartupUpdateAvailable((version) => {
-      const { dialog } = require('electron')
-      dialog.showMessageBox({
-        type: 'info',
-        title: '发现新版本',
-        message: `发现新版本 v${version}`,
-        detail: '下载完成后可在设置页「关于」标签中安装。',
-        buttons: ['立即下载', '跳过此版本', '不再提醒'],
-        defaultId: 0,
-        cancelId: 1,
-      }).then(({ response }) => {
-        if (response === 0) {
-          downloadUpdate().catch((err) => {
-            logEvent('updater.startup-download.fail', { err: err.message }, 'warn')
-          })
-        } else if (response === 1) {
-          // 跳过此版本：记录版本号，下次不同版本再提醒
-          store.set('update.skippedVersion', version)
-          logEvent('updater.skip-version', { version })
-        } else if (response === 2) {
-          // 不再提醒：关闭自动检查
-          store.set('update.autoCheck', false)
-          logEvent('updater.disable-auto-check')
-        }
-      })
+      try {
+        const { showUpdateDialog } = require('./windows')
+        showUpdateDialog(String(version))
+      } catch (err) {
+        logEvent('updater.startup-dialog.fail', { err: err.message }, 'warn')
+      }
     })
 
     // 仅当 autoCheck 为 true 时才自动检查

@@ -106,4 +106,5 @@ contextBridge.exposeInMainWorld('updateAPI', {
   getAutoCheck: () => ipcRenderer.invoke('update:get-auto-check'),
   setAutoCheck: (enabled) => ipcRenderer.invoke('update:set-auto-check', enabled),
   getSkippedVersion: () => ipcRenderer.invoke('update:get-skipped-version'),
+  setSkippedVersion: (version) => ipcRenderer.invoke('update:set-skipped-version', version),
 })

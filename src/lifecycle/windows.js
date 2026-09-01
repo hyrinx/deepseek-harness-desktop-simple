@@ -4,15 +4,15 @@
 
 const { join } = require('node:path')
 const { BrowserWindow, shell, screen } = require('electron')
-const { state, logEvent, bootMark } = require('./state')
-const { store } = require('./store')
+const { state, logEvent, bootMark } = require('../core/state')
+const { store } = require('../core/store')
 const {
   APP_NAME, ICON_PATH,
   MAIN_WIN, IS_WIN, IS_MAC, IS_LINUX,
   DEFAULT_SHORTCUT, INJECT_SESSION_HEADER_CSS, LOADING_HTML,
-} = require('./constants')
+} = require('../core/constants')
 
-const PRELOAD_MAIN = join(__dirname, 'preload', 'preload-main.js')
+const PRELOAD_MAIN = join(__dirname, '..', 'render', 'preload', 'preload-main.js')
 
 // ── 主窗口 ──
 
@@ -69,12 +69,12 @@ function buildMainWindowOptions() {
   return base
 }
 
-// ── 注入脚本缓存（从 src/inject/ 目录读取，避免内联长字符串）
+// ── 注入脚本缓存（从 src/render/inject/ 目录读取，避免内联长字符串）
 const fs = require('node:fs')
 const _injectCache = Object.create(null)
 function getInjectScript(name) {
   if (_injectCache[name]) return _injectCache[name]
-  const filePath = join(__dirname, 'inject', name + '.js')
+  const filePath = join(__dirname, '..', 'render', 'inject', name + '.js')
   _injectCache[name] = fs.readFileSync(filePath, 'utf-8')
   return _injectCache[name]
 }
@@ -224,7 +224,7 @@ const SETTINGS_MODULE_ORDER = [
 let _overlayScript = null
 function getOverlayScript() {
   if (_overlayScript) return _overlayScript
-  const dir = join(__dirname, 'settings-overlay')
+  const dir = join(__dirname, '..', 'render', 'settings-overlay')
   const css = JSON.stringify(fs.readFileSync(join(dir, 'style.css'), 'utf-8'))
   const html = JSON.stringify(fs.readFileSync(join(dir, 'settings-overlay.html'), 'utf-8'))
   const js = fs.readFileSync(join(dir, 'settings-overlay.js'), 'utf-8')
@@ -267,6 +267,24 @@ function hideSettingsOverlay() {
   ).catch(() => {})
 }
 
+// 启动时发现新版本 → 在渲染进程显示 antd 风格更新弹窗
+function showUpdateDialog(version) {
+  showWindow()
+
+  const win = state.mainWindow
+  if (!win || win.isDestroyed()) return
+
+  const injectedKey = '__dshSettingsOverlayInjected'
+  win.webContents.executeJavaScript(`(function(){
+    if (!window.${injectedKey}) {
+      ${getOverlayScript()}
+    }
+    if (window.__dshShowUpdateDialog) window.__dshShowUpdateDialog(${JSON.stringify(version)})
+  })()`).catch((err) => {
+    logEvent('settings-overlay.update-dialog.fail', { err }, 'error')
+  })
+}
+
 // ── 显示/切换 ──
 
 function showWindow() {
@@ -301,6 +319,6 @@ function toggleWindow() {
 
 module.exports = {
   createMainWindow, navigateMainWindow,
-  showSettingsOverlay, hideSettingsOverlay,
+  showSettingsOverlay, hideSettingsOverlay, showUpdateDialog,
   showWindow, toggleWindow,
 }
