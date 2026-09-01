@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: read
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -237,3 +237,13 @@ jobs:
           } > RELEASE_BODY.md
 
           gh release edit "$TAG" --notes-file RELEASE_BODY.md
+
+      - name: 触发 Gitee 同步发行版
+        # 用 GITHUB_TOKEN 创建的 Release 不会触发 release 事件(被 GitHub 抑制),
+        # 因此这里显式以 workflow_dispatch 调起 Gitee 同步工作流,把本次发行版同步到 Gitee。
+        if: steps.meta.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "Sync Release to Gitee" --repo "${{ github.repository }}" \
+            -f tag="${{ steps.meta.outputs.tag }}"

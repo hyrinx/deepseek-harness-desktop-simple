@@ -1,11 +1,24 @@
 name: Sync Release to Gitee
 
-# 每当 GitHub 发布(release published)时触发,把本次 Release 的 tag + 安装包资产 + 发布说明
-# 通过 Gitee OpenAPI 同步到同名 Gitee 仓库的发行版(Release),实现"GitHub 发布、Gitee 自动跟随"。
+# 触发方式：
+#   - release: published —— 仅对"用户手动发布"或"非 GITHUB_TOKEN 发布"生效。
+#     ⚠️ 由仓库内 release.yml 用默认 GITHUB_TOKEN 创建的 Release，其 release 事件会被
+#        GitHub 抑制(避免循环触发)，不会进入这里；这种情况下改手工调动 release.yml
+#        末尾"显式触发同步"这一步(workflow_dispatch)来做，见 release.yml。
+#   - workflow_dispatch —— 手动触发：默认读取 GitHub 最新已发布 Release 同步到 Gitee，
+#     也可通过输入参数 tag 指定要同步的版本(为空则取最新)。
+#
+# 目标：把 GitHub 某个 Release 的 tag + 安装包资产 + 发布说明同步到同名 Gitee 仓库的发行版，
+#   使"GitHub 发布、Gitee 自动跟随"。不再依赖 github.event.release，运行时用 gh 解析，
+#   因此手动触发也能正确同步。
 
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要同步的 Release tag(留空=取 GitHub 最新已发布 Release)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -27,12 +40,34 @@ jobs:
           # 拿全历史与 tag:既用于把 tag 推到 Gitee,也用于核对
           fetch-depth: 0
 
+      - name: 解析目标 Release(tag 为空则取最新)
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          REPO="${{ github.repository }}"
+          INPUT_TAG="${{ inputs.tag }}"
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            # 最新"已发布"(非 draft、非 prerelease 也允许含 prerelease)的 tag
+            TAG="$(gh release list --repo "$REPO" --limit 1 --json tagName --exclude-drafts --exclude-pre-releases --jq '.[0].tagName')"
+          fi
+          [ -n "$TAG" ] || { echo "::error::未找到可同步的 Release"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # 拿到该 release 的 target commit(创建 Gitee release 时用)与正文
+          echo "target_commitish=$(gh release view "$TAG" --repo "$REPO" --json targetCommitish --jq '.targetCommitish')" >> "$GITHUB_OUTPUT"
+          echo "body=$(gh release view "$TAG" --repo "$REPO" --json body --jq '.body // ""')" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$(gh release view "$TAG" --repo "$REPO" --json isPrerelease --jq '.isPrerelease')" >> "$GITHUB_OUTPUT"
+          echo "解析结果: tag=$TAG target_commitish=${{ steps.target.outputs.target_commitish }}"
       - name: 从 GitHub Release 下载资产
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -eo pipefail
           mkdir -p assets
-          gh release download "${{ github.event.release.tag_name }}" --repo "${{ github.repository }}" --dir assets
+          gh release download "${{ steps.target.outputs.tag }}" --repo "${{ github.repository }}" --dir assets
           echo "--- 已下载资产 ---"
           ls -la assets
           echo "--------------------"
@@ -42,9 +77,10 @@ jobs:
         # 若 Gitee 仓库尚未拉过此 tag,Gitee release 的 tag 会指向默认分支头,顺序高于 release 本身。
         if: env.GITEE_TOKEN != ''
         env:
-          GITEE_REMOTE: https://gitee.com/${{ env.GITEE_OWNER }}/${{ env.GITEE_REPO }}.git
+          GITEE_REMOTE: https://hyrinx:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_OWNER }}/${{ env.GITEE_REPO }}.git
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          set -eo pipefail
+          TAG="${{ steps.target.outputs.tag }}"
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
           git push "$GITEE_REMOTE" "refs/tags/$TAG"
@@ -56,7 +92,7 @@ jobs:
         run: |
           OWNER="${{ env.GITEE_OWNER }}"
           REPO="${{ env.GITEE_REPO }}"
-          TAG="${{ github.event.release.tag_name }}"
+          TAG="${{ steps.target.outputs.tag }}"
           CODE=$(curl -s -o /tmp/gitee_rel.json -w '%{http_code}' \
             "https://gitee.com/api/v5/repos/$OWNER/$REPO/releases/tags/$TAG?access_token=$TOKEN")
           if [ "$CODE" = "200" ]; then
@@ -70,14 +106,14 @@ jobs:
         if: env.GITEE_TOKEN != '' && env.gitee_exists == 'false'
         env:
           TOKEN: "${{ env.GITEE_TOKEN }}"
-          RELEASE_BODY: "${{ github.event.release.body }}"
+          RELEASE_BODY: "${{ steps.target.outputs.body }}"
         run: |
           set -eo pipefail
           OWNER="${{ env.GITEE_OWNER }}"
           REPO="${{ env.GITEE_REPO }}"
-          TAG="${{ github.event.release.tag_name }}"
-          PRERELEASE="${{ github.event.release.prerelease }}"
-          TARGET_COMMITISH="${{ github.event.release.target_commitish }}"
+          TAG="${{ steps.target.outputs.tag }}"
+          PRERELEASE="${{ steps.target.outputs.prerelease }}"
+          TARGET_COMMITISH="${{ steps.target.outputs.target_commitish }}"
 
           # 发布说明多行文本用 python 做 JSON 安全编码,避免引号/换行破坏请求体
           BODY_JSON=$(python3 -c "import json,os;print(json.dumps(os.environ['RELEASE_BODY']))")
@@ -111,4 +147,4 @@ jobs:
 
       - name: 完成(Gitee 已存在时提示)
         if: env.GITEE_TOKEN != '' && env.gitee_exists == 'true'
-        run: echo "Gitee Release ${{ github.event.release.tag_name }} 已存在,本次无需操作。如需强制同步,可删除 Gitee 该发行版后重新发布。"
+        run: echo "Gitee Release ${{ steps.target.outputs.tag }} 已存在,本次无需操作。如需强制同步,可删除 Gitee 该发行版后重新触发。"
