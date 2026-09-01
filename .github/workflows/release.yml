@@ -203,7 +203,7 @@ jobs:
               *.deb)      LIN+=("Linux .deb|$url") ;;
               *.rpm)      LIN+=("Linux .rpm|$url") ;;
             esac
-          done < assets.tsv
+          done < assets.txt
 
           {
             echo "## 📦 安装包"
@@ -227,7 +227,8 @@ jobs:
       - name: 触发 Gitee 同步发行版
         # 用 GITHUB_TOKEN 创建的 Release 不会触发 release 事件(被 GitHub 抑制),
         # 因此这里显式以 workflow_dispatch 调起 Gitee 同步工作流,把本次发行版同步到 Gitee。
-        if: steps.meta.outputs.skip == 'false'
+        # always():即使上游"生成安装包下载表"意外失败,也不应阻断把发行版同步到 Gitee。
+        if: always() && steps.meta.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
