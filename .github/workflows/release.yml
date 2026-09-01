@@ -14,12 +14,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            build_flag: --linux
-            artifact_name: linux
-          - os: macos-latest
-            build_flag: --mac
-            artifact_name: macos
+          # TODO(临时):以下 Linux/macOS 构建暂时注释,优先打通"发布→Gitee 同步"链路,
+          # 待 Gitee 同步成功后再恢复完整三平台发布。
+          # - os: ubuntu-latest
+          #   build_flag: --linux
+          #   artifact_name: linux
+          # - os: macos-latest
+          #   build_flag: --mac
+          #   artifact_name: macos
           - os: windows-latest
             build_flag: --win
             artifact_name: windows
