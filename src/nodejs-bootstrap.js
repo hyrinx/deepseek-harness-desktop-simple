@@ -106,34 +106,39 @@ function getText(url, timeoutMs = 15000) {
   })
 }
 
-// ── 查询最新版本 ──
-async function getLatestVersion(major) {
-  logEvent('nodejs-bootstrap.get-latest-version.start', { major })
-  const suffix = platformSuffix()
+// ── 解析下载地址（优先从 SHASUMS256.txt 获取最新版本，失败则回退探测） ──
+async function resolveDownloadUrl(major, suffix) {
+  logEvent('nodejs-bootstrap.resolve-download-url.start', { major })
+  const re = new RegExp(`node-v(\\d+\\.\\d+\\.\\d+)-${suffix}\\.zip`)
+
   for (const base of MIRROR_BASES) {
     try {
       const text = await getText(`${base}/dist/latest-v${major}.x/SHASUMS256.txt`)
       const firstLine = text.split('\n')[0]
-      const re = new RegExp(`node-v(\\d+\\.\\d+\\.\\d+)-${suffix}\\.zip`)
       const m = firstLine.match(re)
       if (m) {
-        logEvent('nodejs-bootstrap.get-latest-version.ok', { version: m[1], base })
-        return m[1]
+        const version = `v${m[1]}`
+        const url = `${base}/dist/${version}/node-${version}-${suffix}.zip`
+        logEvent('nodejs-bootstrap.resolve-download-url.ok', { version, base })
+        return { version, url }
       }
     } catch { /* 继续尝试下一个镜像 */ }
   }
-  logEvent('nodejs-bootstrap.get-latest-version.fail', { major })
-  return null
-}
 
-// ── 探测版本是否存在 ──
-async function probeVersion(versions, suffix) {
-  for (const dv of versions) {
+  // 回退：探测硬编码的候选版本
+  logEvent('nodejs-bootstrap.resolve-download-url.fallback', { major })
+  for (const dv of [`v${major}.11.0`, `v${major}.0.0`]) {
     const fn = `node-${dv}-${suffix}.zip`
     for (const base of MIRROR_BASES) {
-      if (await headRequest(`${base}/dist/${dv}/${fn}`)) return dv
+      const url = `${base}/dist/${dv}/${fn}`
+      if (await headRequest(url)) {
+        logEvent('nodejs-bootstrap.resolve-download-url.fallback-ok', { version: dv, base })
+        return { version: dv, url }
+      }
     }
   }
+
+  logEvent('nodejs-bootstrap.resolve-download-url.fail', { major })
   return null
 }
 
@@ -153,9 +158,11 @@ function downloadFile(url, destPath, onProgress) {
       const file = fs.createWriteStream(destPath)
       res.on('data', (chunk) => {
         downloaded += chunk.length
-        file.write(chunk)
+        const ok = file.write(chunk)
+        if (!ok) res.pause()
         if (onProgress) onProgress({ downloaded, total })
       })
+      file.on('drain', () => { res.resume() })
       res.on('end', () => { file.end(); resolve() })
       res.on('error', (err) => { file.close(); reject(err) })
     })
@@ -221,25 +228,16 @@ async function ensureNodeJs() {
 
   // 确定下载版本
   reportProgress('resolving', { message: '正在查询最新版本...' })
-  const fullVersion = await getLatestVersion(NODE_VERSION)
-  const downloadVersions = fullVersion
-    ? [`v${fullVersion}`]
-    : [`v${NODE_VERSION}.11.0`, `v${NODE_VERSION}.0.0`]
-
-  const downloadVersion = await probeVersion(downloadVersions, suffix)
-  if (!downloadVersion) {
+  const resolved = await resolveDownloadUrl(NODE_VERSION, suffix)
+  if (!resolved) {
     const err = new Error(`无法找到 Node.js v${NODE_VERSION} 的可用版本`)
     logEvent('nodejs-bootstrap.ensure.fail', { err: err.message }, 'error')
     throw err
   }
 
+  const downloadVersion = resolved.version
+  const downloadUrl = resolved.url
   const fn = `node-${downloadVersion}-${suffix}.zip`
-  let downloadUrl = null
-  for (const base of MIRROR_BASES) {
-    const testUrl = `${base}/dist/${downloadVersion}/${fn}`
-    if (await headRequest(testUrl)) { downloadUrl = testUrl; break }
-  }
-  if (!downloadUrl) throw new Error(`无法找到下载地址: ${fn}`)
 
   logEvent('nodejs-bootstrap.download-version', { version: downloadVersion, url: downloadUrl })
 
@@ -363,7 +361,7 @@ function registerNodeJsHandlers(ipcMain) {
   })
 
   ipcMain.handle('nodejs:get-install-path', () => {
-    return { path: getStore().get('nodejs.installPath', '') || '' }
+    return { path: nodeJsInstallPath() || '' }
   })
 
   ipcMain.handle('nodejs:set-install-path', (_e, newPath) => {

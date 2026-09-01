@@ -48,6 +48,29 @@ function runCmd(cmd, args, timeoutMs = 15_000) {
   })
 }
 
+// 使用 spawn 执行命令，实时推送输出到渲染进程，避免 execFile 缓冲导致的"卡住"体验
+function runWithProgress(event, cmd, args, timeoutMs) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { windowsHide: true, shell: IS_WIN, timeout: timeoutMs })
+    let output = ''
+    const send = (text) => {
+      output += text
+      if (event && event.sender && !event.sender.isDestroyed()) {
+        event.sender.send('env:progress', text)
+      }
+    }
+    child.stdout.on('data', (data) => send(String(data)))
+    child.stderr.on('data', (data) => send(String(data)))
+    child.on('error', (err) => {
+      send('\n' + err.message + '\n')
+      resolve({ ok: false, error: err.message, output })
+    })
+    child.on('close', (code) => {
+      resolve({ ok: code === 0, error: code !== 0 ? 'exit code ' + code : '', output })
+    })
+  })
+}
+
 // 查询 npm 包的最新版本号
 function checkLatestNpmPkg(pkgName) {
   return new Promise((resolve) => {
@@ -85,45 +108,6 @@ async function checkDsh() {
   ])
   return { ...installed, latestVersion }
 }
-
-// 使用 spawn 执行命令，实时推送输出到渲染进程，避免 execFile 缓冲导致的"卡住"体验
-function runWithProgress(event, cmd, args, timeoutMs) {
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, { windowsHide: true, shell: IS_WIN, timeout: timeoutMs })
-    let output = ''
-    const send = (text) => {
-      output += text
-      if (event && event.sender && !event.sender.isDestroyed()) {
-        event.sender.send('env:progress', text)
-      }
-    }
-    child.stdout.on('data', (data) => send(String(data)))
-    child.stderr.on('data', (data) => send(String(data)))
-    child.on('error', (err) => {
-      send('\n' + err.message + '\n')
-      resolve({ ok: false, error: err.message, output })
-    })
-    child.on('close', (code) => {
-      resolve({ ok: code === 0, error: code !== 0 ? 'exit code ' + code : '', output })
-    })
-  })
-}
-
-async function updateNpm(event) {
-  require('./state').logEvent('env.update-npm.start')
-  return runWithProgress(event, 'npm', ['install', '-g', 'npm@latest'], 60_000)
-}
-
-async function updatePnpm(event) {
-  require('./state').logEvent('env.update-pnpm.start')
-  return runWithProgress(event, 'npm', ['install', '-g', 'pnpm'], 60_000)
-}
-
-async function updateDsh(event) {
-  require('./state').logEvent('env.update-dsh.start')
-  return runWithProgress(event, 'npm', ['install', '-g', '@deepseek-ai/dsh@latest'], 120_000)
-}
-
 // 检测 dshmarket 插件是否已安装及版本
 // 通过 dsh plugin --profile web list 获取已安装插件列表，解析 dshmarket 的版本
 // 同时通过 npm view 获取最新版本，用于判断是否需要更新
@@ -163,7 +147,20 @@ async function checkPlugin() {
   const [installed, latestVersion] = await Promise.all([checkInstalled, checkLatest])
   return { ...installed, latestVersion }
 }
+async function updateNpm(event) {
+  require('./state').logEvent('env.update-npm.start')
+  return runWithProgress(event, 'npm', ['install', '-g', 'npm@latest'], 60_000)
+}
 
+async function updatePnpm(event) {
+  require('./state').logEvent('env.update-pnpm.start')
+  return runWithProgress(event, 'npm', ['install', '-g', 'pnpm'], 60_000)
+}
+
+async function updateDsh(event) {
+  require('./state').logEvent('env.update-dsh.start')
+  return runWithProgress(event, 'npm', ['install', '-g', '@deepseek-ai/dsh@latest'], 120_000)
+}
 // 安装或更新 dshmarket 插件（dsh plugin add 本身支持覆盖安装）
 async function updatePlugin(event) {
   require('./state').logEvent('env.update-plugin.start')

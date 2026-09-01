@@ -205,16 +205,6 @@ async function bootstrap() {
   await navigateMainWindow()
   await trayP
 
-  // 首次启动：自动弹出设置覆盖层，引导用户检查系统环境
-  if (!store.get('ui.setupDone', false)) {
-    logEvent('bootstrap.first-launch.setup-open')
-    setTimeout(() => {
-      try { showSettingsOverlay() } catch (e) {
-        logEvent('bootstrap.first-launch.settings-overlay.fail', { err: e }, 'error')
-      }
-    }, 800)
-  }
-
   const totalTook = bootMark('bootstrap done')
   logEvent('bootstrap.done', { tookMs: totalTook, uptimeSec: Math.round(process.uptime() * 1000) / 1000 })
 
