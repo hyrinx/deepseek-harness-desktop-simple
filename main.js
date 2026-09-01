@@ -2,20 +2,24 @@
 // DeepSeek Harness (DSH) 轻量桌面包装 — 主入口
 //
 // 模块结构：
-//   src/constants.js  — 常量 + 路径函数 + 注入脚本
-//   src/state.js      — 全局状态 + 日志基础设施 + 进程守卫
-//   src/store.js      — 配置存储（开发：根目录；打包：~/.dsh/storages/）
-//   src/env.js        — 运行时模式 + 环境检测 + 插件安装
-//   src/dsh-home.js   — DSH 路径解析（与 @deepseek-ai/dsh-home-paths 一致）
-//   src/host.js       — dsh 子进程管理（spawn / 就绪 / 终止）
-//   src/windows.js    — 主窗口 + 设置覆盖层（创建 / 导航 / 覆盖层注入）
-//   src/tray.js       — 托盘 + 托盘菜单（原生 Tray + BrowserWindow）
-//   src/autostart.js  — 开机自启
-//   src/ipc.js        — IPC 处理器 + 全局快捷键 + 窗口拖拽
-//   src/lifecycle.js  — 生命周期（destroyUI / 退出 / 重启 / 启动）
+//   src/constants.js     — 常量 + 路径函数 + 注入脚本
+//   src/state.js         — 全局状态 + 日志基础设施 + 进程守卫
+//   src/store.js         — 配置存储（开发：根目录；打包：~/.dsh/storages/）
+//   src/env.js           — 运行时模式 + 环境检测 + 插件安装
+//   src/dsh-home.js      — DSH 路径解析（与 @deepseek-ai/dsh-home-paths 一致）
+//   src/host.js          — dsh 子进程管理（spawn / 就绪 / 终止）
+//   src/windows.js       — 主窗口 + 设置覆盖层（创建 / 导航 / 覆盖层注入）
+//   src/tray.js          — 托盘 + 托盘菜单（原生 Tray + BrowserWindow）
+//   src/autostart.js     — 开机自启
+//   src/shortcut.js      — 全局快捷键管理（主进程）
+//   src/ipc.js           — IPC 处理器（统一集中注册）
+//   src/utils.js         — 通用工具函数（日志文件打开 / 终端打开等）
+//   src/updater.js       — 自动更新（electron-updater + 便携版手动下载）
+//   src/nodejs-bootstrap.js — Node.js 下载与引导
+//   src/lifecycle.js     — 生命周期（destroyUI / 退出 / 重启 / 启动）
 //   src/settings-overlay/  — 设置覆盖层（CSS/HTML/JS，注入到主窗口渲染进程）
-//   src/preload/      — preload 脚本（preload-tray.js / preload-main.js）
-//   main.js           — 入口（本文件：单实例锁 + app 事件 + 启动调度）
+//   src/preload/         — preload 脚本（preload-tray.js / preload-main.js）
+//   main.js              — 入口（本文件：单实例锁 + app 事件 + 启动调度）
 // ═══════════════════════════════════════════════════════════════
 
 const { app, globalShortcut } = require('electron')

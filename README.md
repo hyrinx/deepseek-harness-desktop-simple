@@ -32,6 +32,8 @@ DeepSeek Harness Desktop Simple是一个基于 Electron 的轻量桌面壳，采
 
 - 🚀 调用系统 `dsh web` 启动本地 Web 服务，BrowserWindow 嵌入展示；
   启动失败（dsh 未安装）则弹窗提示并退出
+- 📦 **Node.js 自动引导**：启动时检测全局 Node.js，若不存在则自动打开设置页，
+  引导用户一键下载安装 Node.js（支持国内镜像加速），无需手动配置环境
 - 🪟 Windows 下 Acrylic 亚克力背景 + 透明 `titleBarOverlay`；
   macOS 下 `hiddenInset` 红绿灯 + sidebar 毛玻璃效果；
   Linux 下原生窗口边框 + `titleBarOverlay` 按钮覆盖层
@@ -77,6 +79,9 @@ dsh-desktop（anywhere-labs）与 deepseek-harness-desktop（Tauri 版）两个�
 
 - **Windows**：下载 `.msi` 安装包，双击运行，勾选「Add to PATH」→ 一路 Next 即可
 
+> **💡 提示**：如果系统未安装 Node.js，启动桌面壳后会自动弹出设置页，
+> 你可以在「环境」标签页中一键下载安装 Node.js（支持国内镜像加速），无需手动配置。
+
 #### 2. 安装 DeepSeek Harness CLI
 
 ```bash
@@ -116,6 +121,7 @@ DeepSeek Harness/
 │   ├── host.js              # dsh web 子进程管理（spawn / 就绪 / 终止）
 │   ├── ipc.js               # IPC 处理器（设置 / 日志 / 拖拽 / 窗口控制）
 │   ├── lifecycle.js         # 应用生命周期（bootstrap / 退出 / 重启）
+│   ├── nodejs-bootstrap.js  # Node.js 自动下载与引导（检测 + 下载 + 安装 + 配置）
 │   ├── state.js             # 全局状态 + 日志基础设施 + 进程守卫
 │   ├── store.js             # 配置存储（config.json）
 │   ├── tray.js              # 托盘 + 托盘菜单（原生 Tray + BrowserWindow，零第三方依赖）
@@ -148,6 +154,7 @@ DeepSeek Harness/
 │  lifecycle  ·  windows  ·  tray  ·  ipc      │
 │  host（dsh web 子进程） ·  store ·  env      │
 │  updater（自动更新） ·  state（日志 + 进程守卫）│
+│  nodejs-bootstrap（Node.js 自动引导）          │
 └───────┬───────────────────────────┬──────────┘
         │ BrowserWindow              │ spawn
 ┌───────▼──────────────┐   ┌──────────▼──────────┐
@@ -174,7 +181,8 @@ DeepSeek Harness/
 
 ## 已知限制
 
-- **需要预装环境** — 需系统已安装 Node.js（>= 18）与 dsh CLI，不提供「下载即用」的捆绑运行时；
+- **需要预装环境** — 需系统已安装 Node.js（>= 18）与 dsh CLI。若未安装 Node.js，
+  启动时会自动弹出设置页引导一键下载安装（支持国内镜像加速）；dsh CLI 仍需手动安装；
 - **dsh 更新** — 桌面壳本身支持自动更新，但 dsh CLI 仍需在设置页「环境」标签手动更新；
 - **平台支持** — 已配置 Windows（NSIS + Portable）/ Linux（AppImage + deb + rpm）/
   macOS（dmg + zip）跨平台构建与 CI，但 Linux / macOS 仅完成「构建层面」的支持，
@@ -228,7 +236,8 @@ DeepSeek Harness/
 
 **Q：启动提示「dsh 未安装」？**
 A：请先安装 [Node.js](https://nodejs.org/)（>= 18）与 DeepSeek Harness CLI，
-并确保 `dsh` 在系统 PATH 中可用。
+并确保 `dsh` 在系统 PATH 中可用。如果未安装 Node.js，启动桌面壳后会自动弹出设置页，
+你可以在「环境」标签页中一键下载安装。
 
 **Q：与 dsh-desktop / Tauri 版有什么区别？**
 A：见[对比章节](#与其他-dsh-桌面壳的对比)。本项目的定位是「简洁」——
