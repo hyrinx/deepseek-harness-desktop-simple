@@ -1,16 +1,16 @@
 name: Sync Release to Gitee
 
 # 触发方式：
-#   - release: published —— 仅对"用户手动发布"或"非 GITHUB_TOKEN 发布"生效。
-#     ⚠️ 由仓库内 release.yml 用默认 GITHUB_TOKEN 创建的 Release，其 release 事件会被
-#        GitHub 抑制(避免循环触发)，不会进入这里；这种情况下改手工调动 release.yml
-#        末尾"显式触发同步"这一步(workflow_dispatch)来做，见 release.yml。
 #   - workflow_dispatch —— 手动触发：默认读取 GitHub 最新已发布 Release 同步到 Gitee，
 #     也可通过输入参数 tag 指定要同步的版本(为空则取最新)。
+#   - 由 release.yml 发布成功后显式以 workflow_dispatch 调起(用 GITHUB_TOKEN 创建的
+#     Release 不会触发 release 事件,GitHub 会抑制以免循环触发),把本次发行版同步到 Gitee。
 #
 # 目标：把 GitHub 某个 Release 的 tag + 安装包资产 + 发布说明同步到同名 Gitee 仓库的发行版，
-#   使"GitHub 发布、Gitee 自动跟随"。不再依赖 github.event.release，运行时用 gh 解析，
-#   因此手动触发也能正确同步。
+#   使"GitHub 发布、Gitee 自动跟随"。运行时用 gh 解析 Release,手动触发也能正确同步。
+#
+# 注意：本工作流不允许"缺 GITEE_TOKEN 时静默跳过"——令牌为空会直接报错退出,
+#   避免出现"工作流显示成功、Gitee 却没有同步"的假成功。
 
 on:
   workflow_dispatch:
@@ -25,7 +25,6 @@ permissions:
 
 env:
   # 改成你在 Gitee 的空间地址(path)与仓库路径 —— 与你从 GitHub 导入 Gitee 时填的一致。
-  # 常见就是 GitHub 同名用户名 + 同名仓库名;若不一致请一定改这里。
   GITEE_OWNER: hyrinx
   GITEE_REPO: deepseek-harness-desktop-simple
   # 需要你在 Gitee 生成私人令牌,存到本仓库的 Secrets → GITEE_TOKEN
@@ -51,16 +50,16 @@ jobs:
           if [ -n "$INPUT_TAG" ]; then
             TAG="$INPUT_TAG"
           else
-            # 最新"已发布"(非 draft、非 prerelease 也允许含 prerelease)的 tag
+            # 最新"已发布"(非 draft、允许含 prerelease)的 tag
             TAG="$(gh release list --repo "$REPO" --limit 1 --json tagName --exclude-drafts --exclude-pre-releases --jq '.[0].tagName')"
           fi
           [ -n "$TAG" ] || { echo "::error::未找到可同步的 Release"; exit 1; }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          # 拿到该 release 的 target commit(创建 Gitee release 时用)与正文
           echo "target_commitish=$(gh release view "$TAG" --repo "$REPO" --json targetCommitish --jq '.targetCommitish')" >> "$GITHUB_OUTPUT"
           echo "body=$(gh release view "$TAG" --repo "$REPO" --json body --jq '.body // ""')" >> "$GITHUB_OUTPUT"
           echo "prerelease=$(gh release view "$TAG" --repo "$REPO" --json isPrerelease --jq '.isPrerelease')" >> "$GITHUB_OUTPUT"
-          echo "解析结果: tag=$TAG target_commitish=${{ steps.target.outputs.target_commitish }}"
+          echo "解析结果: tag=$TAG"
+
       - name: 从 GitHub Release 下载资产
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,10 +71,32 @@ jobs:
           ls -la assets
           echo "--------------------"
 
-      - name: 确保 Gitee 存在同名 tag
-        # 把该 tag(与发布提交绑定)推到 Gitee,使 Gitee 侧 release 能定位到正确 commit。
-        # 若 Gitee 仓库尚未拉过此 tag,Gitee release 的 tag 会指向默认分支头,顺序高于 release 本身。
+      - name: 校验 Gitee 令牌(缺失则直接失败,避免静默跳过)
+        run: |
+          set -eo pipefail
+          if [ -z "${{ env.GITEE_TOKEN }}" ]; then
+            echo "::error::GITEE_TOKEN secret 未配置或为空,无法同步到 Gitee。"
+            echo "请在本仓库 Settings → Secrets and variables → Actions 添加 GITEE_TOKEN。"
+            echo "令牌需在 https://gitee.com/personal_access_tokens 生成,权限勾选 releases(至少)。"
+            exit 1
+          fi
+          echo "GITEE_TOKEN 已配置。"
+
+      - name: 诊断 Gitee 当前状态(用于对照同步是否生效)
         if: env.GITEE_TOKEN != ''
+        env:
+          TOKEN: "${{ env.GITEE_TOKEN }}"
+        run: |
+          OWNER="${{ env.GITEE_OWNER }}"
+          REPO="${{ env.GITEE_REPO }}"
+          echo "--- Gitee 现有 Release ---"
+          curl -s "https://gitee.com/api/v5/repos/$OWNER/$REPO/releases?per_page=10&access_token=$TOKEN" \
+            | python3 -c "import json,sys;[print(r['tag_name']) for r in json.load(sys.stdin)]" || true
+          echo "--- Gitee 现有 Tag(前 20) ---"
+          curl -s "https://gitee.com/api/v5/repos/$OWNER/$REPO/tags?per_page=20&access_token=$TOKEN" \
+            | python3 -c "import json,sys;[print(t['name']) for t in json.load(sys.stdin)]" || true
+
+      - name: 确保 Gitee 存在同名 tag
         env:
           GITEE_REMOTE: https://hyrinx:${{ env.GITEE_TOKEN }}@gitee.com/${{ env.GITEE_OWNER }}/${{ env.GITEE_REPO }}.git
         run: |
@@ -83,10 +104,10 @@ jobs:
           TAG="${{ steps.target.outputs.tag }}"
           git config --local user.email "actions@github.com"
           git config --local user.name "GitHub Actions"
-          git push "$GITEE_REMOTE" "refs/tags/$TAG"
+          git push "$GITEE_REMOTE" "refs/tags/$TAG" 2>/dev/null \
+            || echo "::notice::tag $TAG 可能已存在于 Gitee,继续。"
 
       - name: 判断 Gitee Release 是否已存在(幂等)
-        if: env.GITEE_TOKEN != ''
         env:
           TOKEN: "${{ env.GITEE_TOKEN }}"
         run: |
@@ -103,7 +124,7 @@ jobs:
           fi
 
       - name: 创建 Gitee Release 并上传资产
-        if: env.GITEE_TOKEN != '' && env.gitee_exists == 'false'
+        if: env.gitee_exists == 'false'
         env:
           TOKEN: "${{ env.GITEE_TOKEN }}"
           RELEASE_BODY: "${{ steps.target.outputs.body }}"
@@ -146,5 +167,5 @@ jobs:
           [ "$FAIL" = "0" ]
 
       - name: 完成(Gitee 已存在时提示)
-        if: env.GITEE_TOKEN != '' && env.gitee_exists == 'true'
+        if: env.gitee_exists == 'true'
         run: echo "Gitee Release ${{ steps.target.outputs.tag }} 已存在,本次无需操作。如需强制同步,可删除 Gitee 该发行版后重新触发。"

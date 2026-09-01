@@ -165,32 +165,18 @@ jobs:
           TAG="${{ steps.meta.outputs.tag }}"
           BASE="https://github.com/${{ github.repository }}/releases/download/$TAG"
 
-          # 新上传的资产,browser_download_url 字段会被 GitHub 异步生成,立即读取可能为 null，
-          # 导致下载表出现空链接。先轮询等待其就绪(最多约 2.5 分钟),再读取真实地址。
-          ready="false"
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            ready="$(gh release view "$TAG" --json assets \
-                --jq '[.assets[] | .browser_download_url // ""] | all(. != "")' 2>/dev/null || echo false)"
-            if [ "$ready" = "true" ]; then break; fi
-            echo "等待资产下载地址就绪($attempt/10)..."
-            sleep 15
-          done
-          USE_FALLBACK=0
-          if [ "$ready" != "true" ]; then
-            echo "::warning::资产下载地址未及时就绪,改为由文件名推导下载链接(空格转点号)"
-            USE_FALLBACK=1
-          fi
-
-          # 读取 Release 实际托管的资产下载地址,保证下载链接与上传名完全一致
+          # 资产下载地址由文件名与 tag 唯一确定:browser_download_url 格式固定为
+          #   {repo}/releases/download/{tag}/{name}
+          # 上传后该字段才由 GitHub 异步生成,为读到它而轮询会白白拖慢发布。
+          # 这里直接按命名规则推导(空格在 GitHub 存储时转为点号),无需等待任何字段。
           gh release view "$TAG" --json assets \
-            --jq '.assets[] | [.name,.browser_download_url] | @tsv' > assets.tsv
+            --jq '.assets[].name' > assets.txt
 
           WIN=(); MAC=(); LIN=()
-          while IFS=$'\t' read -r name url; do
-            # 真实地址未就绪时,按 GitHub 命名规则(空格->点号)由文件名推导,避免生成空链接
-            if [ -z "$url" ] || [ "$USE_FALLBACK" = "1" ]; then
-              url="${BASE}/${name// /\.}"
-            fi
+          while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            # 按 GitHub 命名规则(空格->点号)由文件名推导下载链接
+            url="${BASE}/${name// /\.}"
             lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
             case "$lower" in
               *.exe)
