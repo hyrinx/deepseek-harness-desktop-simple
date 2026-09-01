@@ -102,31 +102,19 @@ function bindMainWindowNavigation(win, origin) {
 
 function bindMainWindowLifecycle(win) {
   const id = win.id
-  win.on('show', () => logEvent('main-window.show', { id }))
-  win.on('hide', () => logEvent('main-window.hide', { id }))
-  win.on('minimize', () => logEvent('main-window.minimize', { id }))
-  win.on('restore', () => logEvent('main-window.restore', { id }))
   win.on('maximize', () => {
-    logEvent('main-window.maximize', { id })
     win.webContents.send('window-maximize-change', true)
   })
   win.on('unmaximize', () => {
-    logEvent('main-window.unmaximize', { id })
     win.webContents.send('window-maximize-change', false)
   })
-  win.on('focus', () => logEvent('main-window.focus', { id }))
-  win.on('blur', () => logEvent('main-window.blur', { id }))
   win.on('close', (event) => {
     if (!state.isQuitting) {
-      logEvent('main-window.close.prevent-hide', { id })
       event.preventDefault()
       win.hide()
-    } else {
-      logEvent('main-window.close.allow-quit', { id })
     }
   })
   win.on('closed', () => {
-    logEvent('main-window.closed', { id })
     if (state.mainWindow === win) state.mainWindow = null
   })
   win.webContents.on('render-process-gone', (_e, details) => {
@@ -154,10 +142,8 @@ function restoreWindowBounds(win) {
            saved.y >= d.bounds.y - 100 && saved.y < d.bounds.y + d.bounds.height - 100
   })
   if (!visible) {
-    logEvent('main-window.bounds.restore.skip', { reason: 'offscreen', saved })
     return
   }
-  logEvent('main-window.bounds.restore', saved)
   win.setBounds(saved)
 }
 
@@ -183,9 +169,7 @@ function bindWindowBoundsSave(win) {
 
 function createMainWindow(options = {}) {
   const { silent = false } = options
-  logEvent('main-window.create.start', { silent })
   const win = new BrowserWindow(buildMainWindowOptions())
-  logEvent('main-window.create.ok', { id: win.id })
   state.mainWindow = win
 
   bindMainWindowLifecycle(win)
@@ -208,13 +192,11 @@ function createMainWindow(options = {}) {
 async function navigateMainWindow() {
   const win = state.mainWindow
   if (!win || win.isDestroyed()) {
-    logEvent('main-window.navigate.skip', { reason: win ? 'destroyed' : 'null' }, 'warn')
     return
   }
   const origin = state.hostOrigin
   try {
     if (!origin) {
-      logEvent('main-window.navigate.no-host', { id: win.id }, 'warn')
       return
     }
 
@@ -223,13 +205,11 @@ async function navigateMainWindow() {
 
     const rendererUrl = new URL(origin)
     rendererUrl.searchParams.set('dsh-desktop-platform', process.platform)
-    logEvent('main-window.navigate.start', { id: win.id, origin })
     bootMark('navigate to host')
     await win.loadURL(rendererUrl.href)
-    logEvent('main-window.navigate.ok', { id: win.id, tookMs: bootMark('loadURL done') })
+    bootMark('loadURL done')
   } catch (err) {
     logEvent('main-window.navigate.fail', { id: win.id, err }, 'error')
-    // 导航失败不抛错，避免启动流程崩溃（用户可通过托盘菜单操作）
   }
 }
 
@@ -260,15 +240,12 @@ function getOverlayScript() {
 }
 
 function showSettingsOverlay() {
-  // 先确保主窗口显示
   showWindow()
 
   const win = state.mainWindow
   if (!win || win.isDestroyed()) {
-    logEvent('settings-overlay.show.skip', { reason: win ? 'destroyed' : 'null' }, 'warn')
     return
   }
-  logEvent('settings-overlay.show.start')
   const injectedKey = '__dshSettingsOverlayInjected'
   win.webContents.executeJavaScript(`(function(){
     if (window.${injectedKey}) {
@@ -294,18 +271,15 @@ function hideSettingsOverlay() {
 
 function showWindow() {
   if (state.isQuitting) {
-    logEvent('showWindow.skipped.isQuitting')
     return
   }
   if (!state.mainWindow || state.mainWindow.isDestroyed()) {
-    logEvent('showWindow.recreate.mainWindow', { hasHostOrigin: Boolean(state.hostOrigin) })
     if (state.hostOrigin) {
       try {
         createMainWindow()
         navigateMainWindow()
       } catch (e) {
         logEvent('showWindow.recreate.fail', { err: e }, 'error')
-        console.error('[main] 重建窗口失败：', e)
       }
     }
     return
@@ -319,10 +293,8 @@ function toggleWindow() {
   if (state.isQuitting) return
   const w = state.mainWindow
   if (w && !w.isDestroyed() && w.isVisible() && w.isFocused()) {
-    logEvent('toggleWindow.hide')
     w.hide()
   } else {
-    logEvent('toggleWindow.show')
     showWindow()
   }
 }

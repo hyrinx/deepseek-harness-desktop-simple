@@ -83,7 +83,19 @@ function checkLatestNpmPkg(pkgName) {
   })
 }
 
-async function checkNode() { return runCmd('node', ['--version']) }
+async function checkNode() {
+  const result = await runCmd('node', ['--version'])
+  if (!result.ok) return { ...result, path: '' }
+  // 获取 node 可执行文件的完整路径
+  const pathResult = await new Promise((resolve) => {
+    const whichCmd = IS_WIN ? 'where' : 'which'
+    execFile(whichCmd, ['node'], { timeout: 5000, windowsHide: true, shell: IS_WIN },
+      (err, stdout) => {
+        resolve(err ? '' : String(stdout).split('\n')[0].trim())
+      })
+  })
+  return { ...result, path: pathResult }
+}
 
 async function checkNpm() {
   const [installed, latestVersion] = await Promise.all([
@@ -112,24 +124,18 @@ async function checkDsh() {
 // 通过 dsh plugin --profile web list 获取已安装插件列表，解析 dshmarket 的版本
 // 同时通过 npm view 获取最新版本，用于判断是否需要更新
 async function checkPlugin() {
-  require('./state').logEvent('env.check-plugin.start')
-
   const checkInstalled = new Promise((resolve) => {
     execFile('dsh', ['plugin', '--profile', 'web', 'list'],
       { timeout: 15_000, windowsHide: true, shell: IS_WIN, maxBuffer: 8 * 1024 * 1024 },
       (err, stdout) => {
         if (err) {
-          require('./state').logEvent('env.check-plugin.fail', { err: err.message }, 'warn')
           return resolve({ installed: false, version: '', error: err.message })
         }
         const output = String(stdout).trim()
         const match = output.match(/dshmarket[@\s]+([\d.]+)/i)
         if (match) {
-          const version = match[1]
-          require('./state').logEvent('env.check-plugin.ok', { version })
-          resolve({ installed: true, version, error: '' })
+          resolve({ installed: true, version: match[1], error: '' })
         } else {
-          require('./state').logEvent('env.check-plugin.not-found')
           resolve({ installed: false, version: '', error: '' })
         }
       })
@@ -148,30 +154,23 @@ async function checkPlugin() {
   return { ...installed, latestVersion }
 }
 async function updateNpm(event) {
-  require('./state').logEvent('env.update-npm.start')
   return runWithProgress(event, 'npm', ['install', '-g', 'npm@latest'], 60_000)
 }
 
 async function updatePnpm(event) {
-  require('./state').logEvent('env.update-pnpm.start')
   return runWithProgress(event, 'npm', ['install', '-g', 'pnpm'], 60_000)
 }
 
 async function updateDsh(event) {
-  require('./state').logEvent('env.update-dsh.start')
   return runWithProgress(event, 'npm', ['install', '-g', '@deepseek-ai/dsh@latest'], 120_000)
 }
-// 安装或更新 dshmarket 插件（dsh plugin add 本身支持覆盖安装）
 async function updatePlugin(event) {
-  require('./state').logEvent('env.update-plugin.start')
   const before = await checkPlugin()
   const beforeVer = before.installed ? before.version : '(未安装)'
   const res = await runWithProgress(event, 'dsh', ['plugin', '--profile', 'web', 'add', 'dshmarket'], 60_000)
   if (!res.ok) {
-    require('./state').logEvent('env.update-plugin.fail', { err: res.error }, 'error')
     return { ok: false, error: res.error, output: res.output, beforeVer, afterVer: '' }
   }
-  require('./state').logEvent('env.update-plugin.ok', { beforeVer })
   const after = await checkPlugin().catch(() => ({ installed: false, version: '' }))
   return { ok: true, error: '', output: res.output, beforeVer, afterVer: after.installed ? after.version : '' }
 }

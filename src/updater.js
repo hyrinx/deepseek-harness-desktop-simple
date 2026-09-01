@@ -57,7 +57,6 @@ function getUpdateState() {
 
 function setUpdateState(patch) {
   Object.assign(updateState, patch)
-  logEvent('updater.state', patch)
 }
 
 // ── 安装版：electron-updater ──
@@ -78,17 +77,14 @@ function setupInstallerUpdater() {
   au.autoInstallOnAppQuit = true
 
   au.on('checking-for-update', () => {
-    logEvent('updater.installer.checking')
     setUpdateState({ status: 'checking', error: null })
   })
 
   au.on('update-available', (info) => {
-    logEvent('updater.installer.available', { version: info.version })
     setUpdateState({ status: 'available', version: info.version, error: null })
   })
 
   au.on('update-not-available', (info) => {
-    logEvent('updater.installer.not-available', { version: info.version })
     setUpdateState({ status: 'no-update', version: info.version, error: null, checkTime: new Date().toISOString() })
   })
 
@@ -338,8 +334,6 @@ function quitAndInstallPortable() {
 
 function setupUpdater() {
   const m = mode()
-  logEvent('updater.setup', { mode: m })
-
   if (m === 'installer') {
     setupInstallerUpdater()
   }
@@ -347,7 +341,6 @@ function setupUpdater() {
 
 async function checkForUpdates() {
   const m = mode()
-  logEvent('updater.check.start', { mode: m })
 
   if (m === 'installer') {
     await checkForUpdatesInstaller()
@@ -373,7 +366,6 @@ async function checkForUpdates() {
 
 async function downloadUpdate() {
   const m = mode()
-  logEvent('updater.download.start', { mode: m })
 
   if (m === 'installer') {
     return downloadUpdateInstaller()
@@ -384,7 +376,6 @@ async function downloadUpdate() {
 
 function quitAndInstall() {
   const m = mode()
-  logEvent('updater.quitAndInstall', { mode: m })
 
   if (m === 'installer') {
     return quitAndInstallInstaller()

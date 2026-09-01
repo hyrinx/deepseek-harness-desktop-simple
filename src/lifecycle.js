@@ -12,13 +12,8 @@ const { registerGlobalShortcut } = require('./shortcut')
 const { openLogFile, openTerminal } = require('./utils')
 
 function destroyUI() {
-  logEvent('ui.destroy.start', {
-    hasTray: Boolean(state.tray),
-    hasTrayMenu: Boolean(state.trayMenu),
-  })
-  clearRef('trayMenu')  // 先销毁菜单窗口（内部会销毁 tray）
-  clearRef('tray')      // 再销毁 Electron Tray（兜底，tray 可能已被 trayMenu 销毁）
-  logEvent('ui.destroy.done')
+  clearRef('trayMenu')
+  clearRef('tray')
 }
 
 /**
@@ -26,34 +21,21 @@ function destroyUI() {
  * 但最终动作不同（quit vs relaunch），保持独立以避免分支耦合。
  */
 async function requestQuit() {
-  if (state.isQuitting) { logEvent('quit.request.duplicate'); return }
+  if (state.isQuitting) { return }
   state.isQuitting = true
-  const t0 = Date.now()
-  logEvent('quit.request', { cause: 'requestQuit' })
   try { destroyUI() } catch (err) { logEvent('quit.destroyUI.fail', { err }, 'warn') }
   try {
     const { shutdownHost } = require('./host')
     await shutdownHost()
   } catch (err) { logEvent('quit.shutdownHost.fail', { err }, 'warn') }
-  logEvent('quit.app.quit', { tookMs: Date.now() - t0 })
   logWriter.close()
   app.quit()
 }
 
 async function requestRestart() {
-  if (state.isQuitting) { logEvent('restart.request.duplicate'); return }
+  if (state.isQuitting) { return }
   state.isQuitting = true
-  const t0 = Date.now()
   const { realExePath, mode } = require('./env')
-  logEvent('restart.request', {
-    cause: 'requestRestart',
-    mode: mode(),
-    argv: process.argv,
-    execPath: process.execPath,
-    realExePath: realExePath(),
-    isPackaged: app.isPackaged,
-    cwd: process.cwd(),
-  })
   try { destroyUI() } catch (err) { logEvent('restart.destroyUI.fail', { err }, 'warn') }
   try {
     const { shutdownHost } = require('./host')
@@ -63,17 +45,11 @@ async function requestRestart() {
   const cleanArgs = process.argv.slice(1).filter((a) => a !== AUTOSTART_ARG)
   const exe = realExePath()
 
-  // 三种模式统一走 app.relaunch：
-  // 便携版通过 execPath 覆盖指向真实 exe（PORTABLE_EXECUTABLE_FILE，
-  // 含版本号文件名），绕开 %TEMP% 临时目录和内层 exe 名不匹配的问题。
-  // dev 模式 exe 为 null → 用默认 process.execPath（electron.exe）。
-  logEvent('restart.relaunch', { cleanArgs, execPath: exe || '(default)', mode: mode() })
   app.relaunch({
     args: cleanArgs,
     execPath: exe || undefined,
   })
 
-  logEvent('restart.app.quit', { tookMs: Date.now() - t0, cleanArgs })
   logWriter.close()
   app.quit()
 }
@@ -110,16 +86,15 @@ async function bootstrap() {
   app.setAppUserModelId(APP_USER_MODEL_ID)
   session.defaultSession.setPermissionCheckHandler(() => false)
   session.defaultSession.setPermissionRequestHandler((_wc, _p, cb) => cb(false))
-  logEvent('bootstrap.hardenSession.done', { tookMs: Date.now() - t0 })
 
   registerIpcHandlers()
   bootMark('whenReady')
 
   // Node.js 检测：若不存在全局 Node.js，打开设置页引导用户配置
   try {
-    const { checkGlobalNode } = require('./nodejs-bootstrap')
-    const global = await checkGlobalNode()
-    if (global.available) {
+    const { checkNode } = require('./env')
+    const global = await checkNode()
+    if (global.ok) {
       bootMark('nodejs check done (global available)')
     } else {
       bootMark('nodejs check done (not found)')
@@ -139,7 +114,6 @@ async function bootstrap() {
   bootMark('applyAutoStart done')
 
   const silentLaunch = isLaunchedByAutostart()
-  logEvent('bootstrap.silentLaunch', { silentLaunch })
 
   const { createMainWindow, showWindow, navigateMainWindow, showSettingsOverlay } = require('./windows')
   const { createTrayAndMenu } = require('./tray')
@@ -168,7 +142,6 @@ async function bootstrap() {
 
   const shortcut = store.get('shortcuts.toggleWindow', DEFAULT_SHORTCUT)
   async function startTray() {
-    logEvent('bootstrap.trayMenu.create.start')
     createTrayAndMenu({
       onShowMain: showWindow,
       onSettings: showSettingsOverlay,
@@ -184,7 +157,6 @@ async function bootstrap() {
       onRestart: requestRestart,
       onQuit: requestQuit,
     })
-    logEvent('bootstrap.trayMenu.create.ok')
     registerGlobalShortcut(shortcut)
     bootMark('tray + shortcut ready')
   }
@@ -194,19 +166,15 @@ async function bootstrap() {
 
   await hostP
   if (state.hostOrigin === null) {
-    // dsh 启动失败，设置覆盖层已打开，跳过导航但保留托盘供用户重启
-    logEvent('bootstrap.host-fail.no-host')
     await trayP
-    const totalTook = bootMark('bootstrap done')
-    logEvent('bootstrap.done.no-host', { tookMs: totalTook })
+    bootMark('bootstrap done')
     return
   }
   if (state.isQuitting) return
   await navigateMainWindow()
   await trayP
 
-  const totalTook = bootMark('bootstrap done')
-  logEvent('bootstrap.done', { tookMs: totalTook, uptimeSec: Math.round(process.uptime() * 1000) / 1000 })
+  bootMark('bootstrap done')
 
   setupAutoUpdate()
 }

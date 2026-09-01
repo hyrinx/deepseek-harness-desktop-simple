@@ -19,6 +19,7 @@
       checkDsh: function () { try { return window.envAPI.checkDsh() } catch (e) { return { ok: false, error: String(e), version: '' } } },
       getNodejsStatus: function () { try { return window.envAPI.getNodejsStatus() } catch (e) { return { globalAvailable: false, localInstalled: false, localPath: '', pathConfigured: false } } },
       getNodejsInstallPath: function () { try { return window.envAPI.getNodejsInstallPath() } catch (e) { return { path: '' } } },
+      selectNodejsInstallPath: function (currentPath) { try { return window.envAPI.selectNodejsInstallPath(currentPath) } catch (e) { return { path: null } } },
       setNodejsInstallPath: function (path) { try { return window.envAPI.setNodejsInstallPath(path) } catch (e) { return false } },
       startNodejsDownload: function () { try { return window.envAPI.startNodejsDownload() } catch (e) { return { installed: false, reason: 'error', error: String(e) } } },
       onNodejsProgress: function (cb) { try { return window.envAPI.onNodejsProgress(cb) } catch (e) { return function () {} } },

@@ -10,19 +10,18 @@
           statusEl.innerHTML = '<span class="status-dot loading"></span> 检测中...'
           if (updateBtn) updateBtn.disabled = true
           if (refreshBtn) refreshBtn.disabled = true
+          if (key === 'node') DOM.env.nodejsProgress.style.display = 'none'
           return
         }
         versionEl.classList.remove('loading')
         if (key === 'app') {
-          DOM.env.appDownload.style.display = 'none'
-          DOM.env.appInstall.style.display = 'none'
           DOM.env.appProgress.style.display = 'none'
-          if (refreshBtn) refreshBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>'
+          if (updateBtn) updateBtn.style.display = ''
           switch (info.status) {
             case 'available':
               versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
               statusEl.innerHTML = '<span class="status-dot warn"></span> 有新版本可用'
-              DOM.env.appDownload.style.display = 'inline-flex'
+              if (updateBtn) { updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>更新' }
               break
             case 'downloading':
               versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
@@ -30,28 +29,29 @@
               DOM.env.appProgress.style.display = 'flex'
               DOM.env.appFill.style.width = info.progress + '%'
               DOM.env.appProgressText.textContent = info.progress + '%'
-              if (refreshBtn) refreshBtn.style.display = 'none'
+              if (updateBtn) updateBtn.style.display = 'none'
               break
             case 'downloaded':
               versionEl.textContent = 'v' + info.version + ' → v' + info.latestVersion
               statusEl.innerHTML = '<span class="status-dot ok"></span> 下载完成，准备安装'
-              DOM.env.appInstall.style.display = 'inline-flex'
-              if (refreshBtn) refreshBtn.style.display = 'none'
+              if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>安装' }
               break
             case 'no-update':
               versionEl.textContent = 'v' + info.version
               statusEl.innerHTML = '<span class="status-dot ok"></span> 已是最新版本'
+              if (updateBtn) { updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>检查更新' }
               break
             case 'error':
               versionEl.textContent = 'v' + info.version
               statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.latestVersion || '检查失败')
+              if (updateBtn) { updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>检查更新' }
               break
             default:
               versionEl.textContent = 'v' + info.version
               statusEl.innerHTML = '<span class="status-dot loading"></span> 准备中...'
+              if (updateBtn) updateBtn.disabled = true
               break
           }
-          if (refreshBtn) refreshBtn.disabled = (info.status === 'checking' || info.status === 'downloading' || info.status === 'downloaded')
           return
         }
         if (key === 'plugin') {
@@ -90,23 +90,30 @@
           }
         } else if (info.ok) {
           versionEl.textContent = info.version
-          statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
-          if (updateBtn) updateBtn.disabled = false
+          var pathInfo = info.localPath || info.globalPath || ''
+          if (pathInfo) {
+            statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装 (' + pathInfo + ')'
+            statusEl.title = pathInfo
+          } else {
+            statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装（全局）'
+          }
+          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>检查更新' }
+          DOM.env.nodejsProgress.style.display = 'none'
         } else {
           versionEl.textContent = '未安装'
           statusEl.innerHTML = '<span class="status-dot err"></span> ' + (info.version || '未检测到')
-          if (updateBtn && key === 'dsh') updateBtn.disabled = false
-          else if (updateBtn) updateBtn.disabled = true
+          if (updateBtn) { updateBtn.style.display = ''; updateBtn.disabled = false; updateBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>安装' }
+          DOM.env.nodejsProgress.style.display = 'none'
         }
         if (refreshBtn) refreshBtn.disabled = false
       },
       domFor: function (key) {
-        if (key === 'node') return { versionEl: DOM.env.nodeVersion, statusEl: DOM.env.nodeStatus, updateBtn: null, refreshBtn: DOM.env.nodeRefresh }
+        if (key === 'node') return { versionEl: DOM.env.nodeVersion, statusEl: DOM.env.nodeStatus, updateBtn: DOM.env.nodeUpdate, refreshBtn: null }
         if (key === 'npm') return { versionEl: DOM.env.npmVersion, statusEl: DOM.env.npmStatus, updateBtn: DOM.env.npmUpdate, refreshBtn: null }
         if (key === 'pnpm') return { versionEl: DOM.env.pnpmVersion, statusEl: DOM.env.pnpmStatus, updateBtn: DOM.env.pnpmUpdate, refreshBtn: null }
         if (key === 'dsh') return { versionEl: DOM.env.dshVersion, statusEl: DOM.env.dshStatus, updateBtn: DOM.env.dshUpdate, refreshBtn: null }
         if (key === 'plugin') return { versionEl: DOM.env.dshPluginVersion, statusEl: DOM.env.dshPluginStatus, updateBtn: DOM.env.dshPluginBtn, refreshBtn: null }
-        if (key === 'app') return { versionEl: DOM.env.appVersion, statusEl: DOM.env.appStatus, updateBtn: null, refreshBtn: DOM.env.appRefresh }
+        if (key === 'app') return { versionEl: DOM.env.appVersion, statusEl: DOM.env.appStatus, updateBtn: DOM.env.appUpdate, refreshBtn: null }
         return null
       },
       checkOne: function (key) {
@@ -221,64 +228,40 @@
         el.className = 'update-log show' + (cls ? ' ' + cls : '')
         el.scrollTop = el.scrollHeight
       },
-      // Node.js 安装位置
+      // Node.js 安装与状态
       checkNodejs: function () {
         return IPC.getNodejsStatus().then(function (res) {
-          state.env.nodejs = res
-          Env.renderNodejs()
+          if (res.globalAvailable) {
+            state.env.node.ok = true
+            state.env.node.version = res.globalVersion
+            state.env.node.globalPath = res.globalPath || ''
+            state.env.node.localPath = ''
+          } else if (res.localInstalled) {
+            state.env.node.ok = true
+            state.env.node.version = state.env.node.version || ''
+            state.env.node.globalPath = ''
+            state.env.node.localPath = res.localPath || ''
+          } else {
+            state.env.node.globalPath = ''
+            state.env.node.localPath = ''
+          }
+          state.env.nodejs.downloading = false
+          state.env.nodejs.downloadProgress = 0
+          state.env.nodejs.downloadMessage = ''
+          Env.renderOne('node')
           return res
         })
       },
       renderNodejs: function () {
-        const info = state.env.nodejs
-        const row = DOM.env.nodejsPathRow
-        if (!row) return
-        row.style.display = ''
-        const valEl = DOM.env.nodejsPathValue
-        const statusEl = DOM.env.nodejsPathStatus
-        const setBtn = DOM.env.nodejsPathSetBtn
-        const dlBtn = DOM.env.nodejsDownloadBtn
-        const progress = DOM.env.nodejsProgress
-
+        var info = state.env.nodejs
+        var progress = DOM.env.nodejsProgress
         if (info.downloading) {
-          setBtn.style.display = 'none'
-          dlBtn.style.display = 'none'
+          DOM.env.nodeUpdate.style.display = 'none'
           progress.style.display = 'flex'
           DOM.env.nodejsFill.style.width = info.downloadProgress + '%'
           DOM.env.nodejsProgressText.textContent = info.downloadProgress + '%'
-          statusEl.innerHTML = '<span class="status-dot loading"></span> ' + (info.downloadMessage || '下载中...')
           return
         }
         progress.style.display = 'none'
-
-        if (info.globalAvailable) {
-          valEl.textContent = info.globalPath || '（使用全局 Node.js）'
-          valEl.title = info.globalPath
-          statusEl.innerHTML = '<span class="status-dot ok"></span> 全局 Node.js 已满足'
-          setBtn.style.display = 'none'
-          dlBtn.style.display = 'none'
-        } else if (info.localInstalled) {
-          valEl.textContent = info.localPath || '-'
-          valEl.title = info.localPath
-          statusEl.innerHTML = '<span class="status-dot ok"></span> 已安装'
-          setBtn.style.display = ''
-          dlBtn.style.display = 'none'
-          setBtn.title = '修改安装路径'
-        } else if (info.pathConfigured) {
-          valEl.textContent = info.localPath || '-'
-          valEl.title = info.localPath
-          statusEl.innerHTML = '<span class="status-dot warn"></span> 路径已设置，待安装'
-          setBtn.style.display = ''
-          dlBtn.style.display = ''
-          dlBtn.disabled = false
-          dlBtn.innerHTML = '<svg class="btn-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>下载'
-          setBtn.title = '修改安装路径'
-        } else {
-          valEl.textContent = '未设置'
-          statusEl.innerHTML = '<span class="status-dot err"></span> 未配置'
-          setBtn.style.display = ''
-          dlBtn.style.display = 'none'
-          setBtn.title = '设置安装路径'
-        }
       },
     }

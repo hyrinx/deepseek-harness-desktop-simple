@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('envAPI', {
   },
   getNodejsStatus: () => ipcRenderer.invoke('nodejs:status'),
   getNodejsInstallPath: () => ipcRenderer.invoke('nodejs:get-install-path'),
+  selectNodejsInstallPath: (currentPath) => ipcRenderer.invoke('nodejs:select-install-path', currentPath),
   setNodejsInstallPath: (path) => ipcRenderer.invoke('nodejs:set-install-path', path),
   startNodejsDownload: () => ipcRenderer.invoke('nodejs:start-download'),
   onNodejsProgress: (callback) => {

@@ -144,12 +144,9 @@ function calcMenuBounds(mousePos, menuSize) {
  * 菜单失焦时自动隐藏
  */
 function createTrayAndMenu(callbacks) {
-  logEvent('tray.create.start')
   const { onShowMain, onSettings, onOpenLogs, onOpenTerminal, onReload, onRestart, onQuit } = callbacks
 
-  // ── IPC：菜单项点击 ──
   ipcMain.on('tray-menu-select', (_e, action) => {
-    logEvent('ipc.tray-menu-select', { action })
     hideMenuWindow()
     const fn = { show: onShowMain, settings: onSettings,
       logs: onOpenLogs, terminal: onOpenTerminal, reload: onReload, restart: onRestart, quit: onQuit }[action]
@@ -163,14 +160,11 @@ function createTrayAndMenu(callbacks) {
     }
   })
 
-  // ── 创建托盘 ──
   const tray = new Tray(trayImage())
-  if (!IS_MAC) tray.setToolTip(APP_NAME)  // macOS 菜单栏图标不支持 tooltip
+  if (!IS_MAC) tray.setToolTip(APP_NAME)
   state.tray = tray
-  logEvent('tray.created', { trayExists: Boolean(tray) })
 
   tray.on('click', (_e, bounds) => {
-    logEvent('tray.click', { bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null })
     try {
       const { showWindow } = require('./windows')
       showWindow()
@@ -178,16 +172,10 @@ function createTrayAndMenu(callbacks) {
   })
 
   tray.on('right-click', (_e, bounds) => {
-    logEvent('tray.right-click', {
-      bounds: bounds ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height } : null,
-    })
     showMenuWindow()
   })
 
   tray.on('destroy', () => logEvent('tray.destroy', { isQuitting: state.isQuitting }, state.isQuitting ? 'info' : 'warn'))
-  tray.on('balloon-show', () => logEvent('tray.balloon-show'))
-  tray.on('balloon-click', () => logEvent('tray.balloon-click'))
-  tray.on('balloon-closed', () => logEvent('tray.balloon-closed'))
 
   // ── 菜单窗口（懒创建，复用；移到屏幕外代替 hide 消除频闪） ──
   //
@@ -208,7 +196,7 @@ function createTrayAndMenu(callbacks) {
       width: MENU_WIDTH, height: MENU_HEIGHT,
       show: false,
       frame: false,
-      transparent: !IS_LINUX,  // Linux 部分桌面环境（Xfce/MATE/无合成器）不支持透明窗口
+      transparent: !IS_LINUX,
       resizable: false, movable: false,
       skipTaskbar: true, alwaysOnTop: true, focusable: true,
       fullscreenable: false, hasShadow: false,
@@ -218,7 +206,6 @@ function createTrayAndMenu(callbacks) {
         contextIsolation: true, nodeIntegration: false, sandbox: true,
       },
     })
-    logEvent('menu-window.created', { id: menuWin.id })
 
     try { menuWin.setAlwaysOnTop(true, 'screen-saver') }
     catch (err) { logEvent('menu-window.topmost.fail', { err }, 'warn') }
@@ -234,11 +221,9 @@ function createTrayAndMenu(callbacks) {
         menuWin.setBounds(bounds)
         menuWin.focus()
         pendingShowPos = null
-        logEvent('menu-window.first-show', { bounds })
       }
     })
 
-    // 内容加载后测量实际尺寸，自适应窗口宽高
     menuWin.webContents.on('did-finish-load', () => {
       try {
         menuWin.webContents.executeJavaScript(`
@@ -253,20 +238,16 @@ function createTrayAndMenu(callbacks) {
           if (size && menuWin && !menuWin.isDestroyed()) {
             menuSize = { width: size.width, height: size.height }
             menuWin.setSize(size.width, size.height)
-            logEvent('menu-window.resize', { width: size.width, height: size.height })
           }
         }).catch(() => {})
-      } catch (err) { logEvent('menu-window.resize.fail', { err }, 'warn') }
+      } catch (err) { /* ignore */ }
     })
 
-    // 失焦后移到屏幕外（不销毁窗口表面）
     menuWin.on('blur', () => {
-      logEvent('menu-window.blur')
       hideMenuWindow()
     })
 
     menuWin.on('closed', () => {
-      logEvent('menu-window.closed')
       menuWin = null
       menuReady = false
     })
@@ -281,12 +262,10 @@ function createTrayAndMenu(callbacks) {
 
     if (menuReady && !win.isDestroyed()) {
       const bounds = calcMenuBounds(mousePos, menuSize)
-      logEvent('menu-window.position', { mousePos, bounds })
       win.setBounds(bounds)
       win.focus()
     } else {
       pendingShowPos = mousePos
-      logEvent('menu-window.pending-show', { mousePos })
     }
   }
 
@@ -294,11 +273,10 @@ function createTrayAndMenu(callbacks) {
     if (menuWin && !menuWin.isDestroyed()) {
       try {
         menuWin.setBounds({ ...OFFSCREEN, width: menuSize.width, height: menuSize.height })
-      } catch (err) { logEvent('menu-window.hide.fail', { err }, 'warn') }
+      } catch (err) { /* ignore */ }
     }
   }
 
-  // ── 暴露给外部的托盘菜单接口 ──
   state.trayMenu = {
     show: showMenuWindow,
     hide: hideMenuWindow,
@@ -312,7 +290,6 @@ function createTrayAndMenu(callbacks) {
       }
     },
   }
-  logEvent('tray.create.ok')
 }
 
 module.exports = { createTrayAndMenu }

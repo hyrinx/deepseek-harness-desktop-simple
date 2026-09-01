@@ -4,11 +4,12 @@
 // 流程：
 //   1. 检测全局 node 是否可用
 //   2. 若不可用 → 打开设置页，用户选择路径并点击下载
-//   3. 下载 zip → 解压 → 安装 → 配置 npm → 设置 PATH
+//   3. 下载 zip → 解压 → 安装 → 配置 npm → 设置 PATH（进程 + 系统）
 //   4. 通过 IPC 推送进度给渲染进程
 // ═══════════════════════════════════════════════════════════════
 
 const { execFile } = require('node:child_process')
+const { dialog } = require('electron')
 const fs = require('node:fs')
 const path = require('node:path')
 const os = require('node:os')
@@ -22,6 +23,8 @@ const NPM_REGISTRY = 'https://registry.npmmirror.com'
 const DOWNLOAD_TIMEOUT = 300_000
 const MIRROR_BASES = ['https://nodejs.org', 'https://npmmirror.com/mirrors/node']
 
+const { checkNode } = require('./env')
+
 // ── 平台后缀 ──
 function platformSuffix() {
   const a = process.arch === 'arm64' ? 'arm64' : 'x64'
@@ -30,15 +33,52 @@ function platformSuffix() {
   return `linux-${a}`
 }
 
-// ── 安装路径 ──
-let _store = null
-function getStore() {
-  if (!_store) _store = require('./store').store
-  return _store
+// ── 让出事件循环，允许渲染进程更新 UI ──
+function yieldToEventLoop() {
+  return new Promise((resolve) => setImmediate(resolve))
 }
 
+// ── 写入系统环境变量（Windows 注册表 HKCU\Environment） ──
+function writeSystemEnvWin(nodeBinPath, globalDir) {
+  return new Promise((resolve) => {
+    const psScript = [
+      `$nodeBin = '${nodeBinPath.replace(/'/g, "''")}'`,
+      `$globalDir = '${globalDir.replace(/'/g, "''")}'`,
+      `[Environment]::SetEnvironmentVariable('NODE_HOME', $nodeBin, 'User')`,
+      `$currentPath = [Environment]::GetEnvironmentVariable('PATH', 'User')`,
+      `if ($currentPath -notlike "*$nodeBin*") {`,
+      `  $newPath = "$nodeBin;$globalDir;$currentPath"`,
+      `  [Environment]::SetEnvironmentVariable('PATH', $newPath, 'User')`,
+      `}`,
+    ].join('; ')
+    execFile('powershell', ['-NoProfile', '-Command', psScript], { timeout: 15000, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) {
+          logEvent('nodejs-bootstrap.system-env.fail', { err: err.message, stderr }, 'warn')
+          return resolve(false)
+        }
+        logEvent('nodejs-bootstrap.system-env.ok', { nodeBinPath, globalDir })
+        resolve(true)
+      })
+  })
+}
+
+// ── 安装路径（内存变量，不持久化） ──
+// _installPath 是用户选择的父目录，实际 Node.js 二进制文件安装在 _installPath/nodejs 子目录中
+let _installPath = null
+
 function nodeJsInstallPath() {
-  return getStore().get('nodejs.installPath', '') || null
+  return _installPath
+}
+
+function nodeJsBinPath() {
+  if (!_installPath) return null
+  const normalized = _installPath.replace(/[/\\]+$/, '')
+  const lower = normalized.toLowerCase()
+  if (lower.endsWith('nodejs')) {
+    return normalized
+  }
+  return path.join(normalized, 'nodejs')
 }
 
 // ── 进度回调 ──
@@ -53,28 +93,6 @@ function reportProgress(stage, detail) {
   if (progressCallback) {
     try { progressCallback(stage, detail) } catch { /* ignore */ }
   }
-}
-
-// ── 检测全局 Node.js ──
-function checkGlobalNode() {
-  return new Promise((resolve) => {
-    execFile('node', ['--version'], { timeout: 5000, windowsHide: true, shell: IS_WIN },
-      (err, stdout) => {
-        if (err) {
-          logEvent('nodejs-bootstrap.check-global.fail', { err: err.message })
-          return resolve({ available: false, version: '', path: '' })
-        }
-        const version = String(stdout).trim()
-        // 获取 node 可执行文件的完整路径
-        const whichCmd = IS_WIN ? 'where' : 'which'
-        execFile(whichCmd, ['node'], { timeout: 5000, windowsHide: true, shell: IS_WIN },
-          (err2, stdout2) => {
-            const nodePath = err2 ? '' : String(stdout2).split('\n')[0].trim()
-            logEvent('nodejs-bootstrap.check-global.ok', { version, path: nodePath })
-            resolve({ available: true, version, path: nodePath })
-          })
-      })
-  })
 }
 
 // ── HTTP 请求（HEAD 探测） ──
@@ -171,25 +189,20 @@ function downloadFile(url, destPath, onProgress) {
   })
 }
 
-// ── 解压 zip ──
+// ── 解压 zip（adm-zip，零依赖纯 JS） ──
+const AdmZip = require('adm-zip')
+
 function extractZip(zipPath, destDir) {
-  return new Promise((resolve, reject) => {
-    if (IS_WIN) {
-      execFile('powershell', ['-Command', `Expand-Archive -Path '${zipPath}' -DestinationPath '${destDir}' -Force`],
-        { timeout: 120_000, windowsHide: true }, (err) => {
-          if (err) return reject(new Error(`解压失败: ${err.message}`))
-          resolve()
-        })
-    } else if (IS_MAC || IS_LINUX) {
-      execFile('unzip', ['-o', zipPath, '-d', destDir],
-        { timeout: 120_000 }, (err) => {
-          if (err) return reject(new Error(`解压失败: ${err.message}`))
-          resolve()
-        })
-    } else {
-      reject(new Error(`不支持的操作系统: ${process.platform}`))
-    }
-  })
+  logEvent('nodejs-bootstrap.extract.start', { zipPath, destDir })
+  try {
+    const zip = new AdmZip(zipPath)
+    zip.extractAllTo(destDir, true)
+    const topFiles = fs.readdirSync(destDir)
+    logEvent('nodejs-bootstrap.extract.ok', { destDir, fileCount: topFiles.length })
+  } catch (err) {
+    logEvent('nodejs-bootstrap.extract.fail', { err: err.message }, 'error')
+    throw new Error(`解压失败: ${err.message}`)
+  }
 }
 
 // ── 运行 npm 命令 ──
@@ -210,8 +223,8 @@ function runNpm(args, env) {
 async function ensureNodeJs() {
   logEvent('nodejs-bootstrap.ensure.start')
 
-  const global = await checkGlobalNode()
-  if (global.available) {
+  const global = await checkNode()
+  if (global.ok) {
     logEvent('nodejs-bootstrap.ensure.skip', { reason: '全局 Node.js 已存在', version: global.version })
     return { installed: false, reason: 'already-available', version: global.version }
   }
@@ -223,8 +236,9 @@ async function ensureNodeJs() {
   }
 
   const suffix = platformSuffix()
-  const globalDir = path.join(installPath, 'node_global')
-  const cacheDir = path.join(installPath, 'node_cache')
+  const nodeBinPath = nodeJsBinPath()
+  const globalDir = path.join(nodeBinPath, 'node_global')
+  const cacheDir = path.join(nodeBinPath, 'node_cache')
 
   // 确定下载版本
   reportProgress('resolving', { message: '正在查询最新版本...' })
@@ -260,9 +274,11 @@ async function ensureNodeJs() {
 
     // 解压
     reportProgress('extracting', { message: '正在解压...' })
+    await yieldToEventLoop()
     const extractDir = path.join(tmpDir, 'extracted')
     fs.mkdirSync(extractDir, { recursive: true })
-    await extractZip(zipPath, extractDir)
+    extractZip(zipPath, extractDir)
+    await yieldToEventLoop()
 
     const entries = fs.readdirSync(extractDir)
     const topDir = entries.find((e) => fs.statSync(path.join(extractDir, e)).isDirectory())
@@ -271,29 +287,38 @@ async function ensureNodeJs() {
 
     // 安装
     reportProgress('installing', { message: '正在安装...' })
-    if (fs.existsSync(installPath)) {
-      fs.rmSync(installPath, { recursive: true, force: true })
+    await yieldToEventLoop()
+    if (fs.existsSync(nodeBinPath)) {
+      fs.rmSync(nodeBinPath, { recursive: true, force: true })
     }
-    fs.mkdirSync(installPath, { recursive: true })
+    fs.mkdirSync(nodeBinPath, { recursive: true })
 
     for (const entry of fs.readdirSync(nodeDir)) {
-      fs.cpSync(path.join(nodeDir, entry), path.join(installPath, entry), { recursive: true })
+      fs.cpSync(path.join(nodeDir, entry), path.join(nodeBinPath, entry), { recursive: true })
     }
 
     fs.mkdirSync(globalDir, { recursive: true })
     fs.mkdirSync(cacheDir, { recursive: true })
+    await yieldToEventLoop()
 
-    // 更新 PATH
+    // 更新 PATH（进程内）
     const currentPath = process.env.PATH || ''
-    if (!currentPath.includes(installPath)) {
+    if (!currentPath.includes(nodeBinPath)) {
       process.env.PATH = IS_WIN
-        ? `${installPath};${globalDir};${currentPath}`
-        : `${installPath}/bin:${globalDir}/bin:${currentPath}`
+        ? `${nodeBinPath};${globalDir};${currentPath}`
+        : `${nodeBinPath}/bin:${globalDir}/bin:${currentPath}`
     }
-    process.env.NODE_HOME = installPath
+    process.env.NODE_HOME = nodeBinPath
+
+    // 写入系统环境变量（Windows 注册表，持久化）
+    if (IS_WIN) {
+      reportProgress('configuring', { message: '正在写入系统环境变量...' })
+      await writeSystemEnvWin(nodeBinPath, globalDir)
+    }
 
     // 配置 npm
     reportProgress('configuring', { message: '正在配置 npm...' })
+    await yieldToEventLoop()
     const env = { ...process.env, PATH: process.env.PATH }
 
     for (const cfg of [
@@ -301,6 +326,8 @@ async function ensureNodeJs() {
       { args: ['config', 'set', 'cache', cacheDir], label: 'cache' },
       { args: ['config', 'set', 'registry', NPM_REGISTRY], label: 'registry' },
     ]) {
+      reportProgress('configuring', { message: `正在配置 npm ${cfg.label}...` })
+      await yieldToEventLoop()
       const result = await runNpm(cfg.args, env)
       if (!result.ok) {
         logEvent('nodejs-bootstrap.npm-config.fail', { label: cfg.label, error: result.output }, 'warn')
@@ -308,11 +335,13 @@ async function ensureNodeJs() {
         logEvent('nodejs-bootstrap.npm-config.ok', { label: cfg.label })
       }
     }
+    await yieldToEventLoop()
 
     // 验证
     reportProgress('verifying', { message: '正在验证安装...' })
+    await yieldToEventLoop()
     const verifyResult = await new Promise((resolve) => {
-      execFile(path.join(installPath, IS_WIN ? 'node.exe' : 'node'), ['--version'],
+      execFile(path.join(nodeBinPath, IS_WIN ? 'node.exe' : 'node'), ['--version'],
         { timeout: 10000, windowsHide: true, env },
         (err, stdout) => {
           if (err) return resolve({ ok: false, error: err.message })
@@ -347,15 +376,16 @@ async function ensureNodeJs() {
 // ── IPC 注册 ──
 function registerNodeJsHandlers(ipcMain) {
   ipcMain.handle('nodejs:status', async () => {
-    const global = await checkGlobalNode()
+    const global = await checkNode()
     const installPath = nodeJsInstallPath()
-    const installed = installPath && fs.existsSync(installPath) && fs.existsSync(path.join(installPath, IS_WIN ? 'node.exe' : 'node'))
+    const binPath = nodeJsBinPath()
+    const installed = binPath && fs.existsSync(binPath) && fs.existsSync(path.join(binPath, IS_WIN ? 'node.exe' : 'node'))
     return {
-      globalAvailable: global.available,
+      globalAvailable: global.ok,
       globalVersion: global.version,
       globalPath: global.path || '',
       localInstalled: Boolean(installed),
-      localPath: installPath || '',
+      localPath: binPath || '',
       pathConfigured: Boolean(installPath),
     }
   })
@@ -364,10 +394,22 @@ function registerNodeJsHandlers(ipcMain) {
     return { path: nodeJsInstallPath() || '' }
   })
 
+  ipcMain.handle('nodejs:select-install-path', async (_e, currentPath) => {
+    const result = await dialog.showOpenDialog({
+      title: '选择 Node.js 安装位置',
+      defaultPath: currentPath || '',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return { path: null }
+    }
+    return { path: result.filePaths[0] }
+  })
+
   ipcMain.handle('nodejs:set-install-path', (_e, newPath) => {
     if (!newPath || typeof newPath !== 'string') return false
-    getStore().set('nodejs.installPath', newPath.trim())
-    logEvent('nodejs-bootstrap.install-path.changed', { path: newPath.trim() })
+    _installPath = newPath.trim()
+    logEvent('nodejs-bootstrap.install-path.changed', { path: _installPath })
     return true
   })
 
@@ -393,8 +435,8 @@ function registerNodeJsHandlers(ipcMain) {
 }
 
 module.exports = {
-  checkGlobalNode,
   registerNodeJsHandlers,
   nodeJsInstallPath,
+  nodeJsBinPath,
   setProgressCallback,
 }
