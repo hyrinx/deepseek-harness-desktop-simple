@@ -134,29 +134,53 @@ jobs:
             echo "$NOTES"
           } > NOTES.md
 
-      - name: 创建 Release 并上传资产
+      - name: 创建 Release(幂等,不传资产,带重试)
         if: steps.meta.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eo pipefail
           TAG="${{ steps.meta.outputs.tag }}"
-          # 直接在服务端按当前提交建 tag+Release(--target $GITHUB_SHA),
-          # 不会再产生未绑定的 untagged Release,下载链接也不会为空
-          gh release create "$TAG" \
-            dist/*/*.exe dist/*/*.dmg dist/*/*.AppImage dist/*/*.deb dist/*/*.rpm \
-            dist/*/*.zip dist/*/*.blockmap dist/*/latest*.yml \
-            --target "$GITHUB_SHA" \
-            --title "$TAG" \
-            -F NOTES.md
-          # 等待 GitHub API 索引完成,避免竞态
-          sleep 5
-          ASSET_COUNT=$(gh release view "$TAG" --json assets --jq '.assets | length')
-          echo "已上传资产数量: $ASSET_COUNT"
-          if [ "$ASSET_COUNT" -eq 0 ]; then
-            echo "::error::未上传任何资产,请检查 gh release create 的通配符是否匹配到文件"
+          repo="${{ github.repository }}"
+          retry() { local n=4; local i; for i in $(seq 1 $n); do "$@" && return 0; echo "重试($i/$n): $*"; sleep 8; done; echo "::error::重试仍失败: $*"; return 1; }
+          # 直接在服务端按当前提交建 tag+Release;幂等:远程已存在则跳过
+          if ! gh release view "$TAG" --repo "$repo" >/dev/null 2>&1; then
+            retry gh release create "$TAG" --repo "$repo" \
+              --target "$GITHUB_SHA" --title "$TAG" -F NOTES.md
+          fi
+
+      - name: 上传资产(逐文件,自动重试抗网络抖动)
+        if: steps.meta.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          repo="${{ github.repository }}"
+          retry() { local n=4; local i; for i in $(seq 1 $n); do "$@" && return 0; echo "重试($i/$n): $*"; sleep 8; done; echo "::error::重试仍失败: $*"; return 1; }
+          mapfile -d '' FILES < <(find dist -type f \( \
+                -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \
+                -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \
+                -o -name '*.blockmap' -o -name 'latest*.yml' \) -print0)
+          echo "待上传文件数: ${#FILES[@]}"
+          printf '  - %s\n' "${FILES[@]}"
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::dist 下未发现可上传的安装包产物"
             exit 1
           fi
+          for f in "${FILES[@]}"; do
+            echo "==> 上传 $f"
+            retry gh release upload "$TAG" --repo "$repo" "$f" --clobber
+          done
+          # 等待 GitHub 索引完成,再核对资产数
+          sleep 5
+          ASSET_COUNT=$(gh release view "$TAG" --repo "$repo" --json assets --jq '.assets | length')
+          echo "已上传资产数量: $ASSET_COUNT"
+          if [ "$ASSET_COUNT" -eq 0 ]; then
+            echo "::error::上传后资产数仍为 0"
+            exit 1
+          fi
+          echo "ASSET_COUNT=$ASSET_COUNT" >> "$GITHUB_ENV"
 
       - name: 生成安装包下载表(按真实资产)并更新正文
         if: steps.meta.outputs.skip == 'false'
